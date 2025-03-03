@@ -152,10 +152,12 @@
             color: #ffcc00;
             margin-bottom: 15px;
             text-align: center;
+            pointer-events: auto;
         }
         #dialog-content {
             margin-bottom: 20px;
             line-height: 1.5;
+            pointer-events: auto;
         }
         #dialog-close {
             background: #ffcc00;
@@ -167,6 +169,27 @@
             font-weight: bold;
             display: block;
             margin: 0 auto;
+            position: relative;
+            z-index: 700;
+            pointer-events: auto;
+        }
+        /* Make sure buttons always have proper click events */
+        button {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
+        .action-btn {
+            background: #ffcc00 !important;
+            color: black !important;
+            border: none !important;
+            padding: 8px 20px !important;
+            border-radius: 20px !important;
+            cursor: pointer !important;
+            font-weight: bold !important;
+            margin: 10px 10px 15px 0 !important;
+            position: relative !important;
+            z-index: 700 !important;
+            pointer-events: auto !important;
         }
         .interaction-indicator {
             position: absolute;
@@ -220,7 +243,7 @@
     <div id="interaction-dialog">
         <div id="dialog-title">Interactive Object</div>
         <div id="dialog-content">Description of the interactive object goes here.</div>
-        <button id="dialog-close" type="button">Close</button>
+        <button id="dialog-close" type="button" style="z-index: 700;">Close</button>
     </div>
     
     <div id="instructions">
@@ -1251,13 +1274,43 @@
                     const existingButtons = contentEl.querySelectorAll('.action-btn');
                     existingButtons.forEach(btn => btn.remove());
                     
-                    // Add action buttons if any
+                    // Set up dialog click behaviors - do this BEFORE adding content
+                    // We use a global approach that works for all dialogs
+                    
+                    // 1. Set up global dialog close function
+                    window.closeInteractionDialog = function() {
+                        document.getElementById('interaction-dialog').style.display = 'none';
+                    };
+                    
+                    // 2. Direct close button handler with global function
+                    const closeButton = document.getElementById('dialog-close');
+                    closeButton.onclick = window.closeInteractionDialog;
+                    
+                    // 3. Background click handler
+                    dialogEl.onclick = function(e) {
+                        if (e.target === dialogEl) {
+                            window.closeInteractionDialog();
+                        }
+                    };
+                    
+                    // 4. Escape key handler
+                    const escKeyHandler = function(e) {
+                        if (e.key === 'Escape') {
+                            window.closeInteractionDialog();
+                            document.removeEventListener('keydown', escKeyHandler);
+                        }
+                    };
+                    document.removeEventListener('keydown', escKeyHandler); // Remove any existing handler
+                    document.addEventListener('keydown', escKeyHandler);
+                    
+                    // Add action buttons if any - using global approach
                     if (obj.content.actions && obj.content.actions.length > 0) {
                         // Add action buttons
                         obj.content.actions.forEach(action => {
                             const actionBtn = document.createElement('button');
                             actionBtn.textContent = action;
                             actionBtn.className = 'action-btn';
+                            actionBtn.type = 'button'; // Explicit button type
                             actionBtn.style.marginRight = '10px';
                             actionBtn.style.marginBottom = '15px';
                             actionBtn.style.background = '#ffcc00';
@@ -1266,12 +1319,13 @@
                             actionBtn.style.padding = '8px 15px';
                             actionBtn.style.borderRadius = '15px';
                             actionBtn.style.cursor = 'pointer';
+                            actionBtn.style.zIndex = '700'; // Ensure it's above other elements
                             
-                            // Use direct onclick handler
-                            actionBtn.onclick = function() {
+                            // Global action wrapper
+                            actionBtn.onclick = function(e) {
+                                e.stopPropagation(); // Prevent event bubbling
                                 if (obj.action) obj.action();
-                                dialogEl.style.display = 'none';
-                                return false; // Prevent default
+                                window.closeInteractionDialog();
                             };
                             
                             contentEl.appendChild(document.createElement('br'));
@@ -1281,30 +1335,6 @@
                     
                     // Show dialog
                     dialogEl.style.display = 'block';
-                    
-                    // Setup close button with direct inline handler
-                    // This is a more direct approach that should work in all browsers
-                    document.getElementById('dialog-close').onclick = function() {
-                        dialogEl.style.display = 'none';
-                        return false; // Prevent default action
-                    };
-                    
-                    // Add click event on dialog background to close
-                    dialogEl.onclick = function(e) {
-                        // Only close if clicking directly on the dialog background
-                        if (e.target === dialogEl) {
-                            dialogEl.style.display = 'none';
-                        }
-                    };
-                    
-                    // Add keyboard escape key to close dialog
-                    const escKeyHandler = function(e) {
-                        if (e.key === 'Escape') {
-                            dialogEl.style.display = 'none';
-                            document.removeEventListener('keydown', escKeyHandler);
-                        }
-                    };
-                    document.addEventListener('keydown', escKeyHandler);
                     
                     return true;
                 }
