@@ -220,7 +220,7 @@
     <div id="interaction-dialog">
         <div id="dialog-title">Interactive Object</div>
         <div id="dialog-content">Description of the interactive object goes here.</div>
-        <button id="dialog-close">Close</button>
+        <button id="dialog-close" type="button">Close</button>
     </div>
     
     <div id="instructions">
@@ -1267,11 +1267,12 @@
                             actionBtn.style.borderRadius = '15px';
                             actionBtn.style.cursor = 'pointer';
                             
-                            // Use addEventListener instead of direct onclick assignment
-                            actionBtn.addEventListener('click', function() {
+                            // Use direct onclick handler
+                            actionBtn.onclick = function() {
                                 if (obj.action) obj.action();
                                 dialogEl.style.display = 'none';
-                            });
+                                return false; // Prevent default
+                            };
                             
                             contentEl.appendChild(document.createElement('br'));
                             contentEl.appendChild(actionBtn);
@@ -1281,17 +1282,20 @@
                     // Show dialog
                     dialogEl.style.display = 'block';
                     
-                    // Setup close button with addEventListener
-                    const closeBtn = document.getElementById('dialog-close');
-                    
-                    // Remove any existing event listeners
-                    const newCloseBtn = closeBtn.cloneNode(true);
-                    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-                    
-                    // Add new event listener
-                    newCloseBtn.addEventListener('click', function() {
+                    // Setup close button with direct inline handler
+                    // This is a more direct approach that should work in all browsers
+                    document.getElementById('dialog-close').onclick = function() {
                         dialogEl.style.display = 'none';
-                    });
+                        return false; // Prevent default action
+                    };
+                    
+                    // Add click event on dialog background to close
+                    dialogEl.onclick = function(e) {
+                        // Only close if clicking directly on the dialog background
+                        if (e.target === dialogEl) {
+                            dialogEl.style.display = 'none';
+                        }
+                    };
                     
                     // Add keyboard escape key to close dialog
                     const escKeyHandler = function(e) {
