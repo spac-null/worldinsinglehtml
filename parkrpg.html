@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Park RPG Adventure</title>
+    <style>
+        :root {
+            --bg-color: #122e0b;
+            --text-color: #e0e0e0;
+            --accent-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --success-color: #8BC34A;
+            --warning-color: #FFC107;
+            --danger-color: #FF5722;
+            --panel-bg: rgba(0, 41, 13, 0.85);
+            --panel-border: rgba(76, 175, 80, 0.3);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-size: 18px;
+            color: var(--accent-color);
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .loading-progress {
+            margin-top: 15px;
+            width: 300px;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .loading-bar {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 5px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(76, 175, 80, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #stats-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            padding: 10px;
+            min-width: 200px;
+            pointer-events: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #inventory-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            color: var(--accent-color);
+            font-size: 18px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        #inventory-panel {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            width: 300px;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            padding: 15px;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .inventory-item {
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .inventory-item:hover {
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+        
+        #dialog-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            padding: 15px;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .dialog-portrait {
+            width: 80px;
+            height: 80px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 2px solid var(--panel-border);
+            border-radius: 50%;
+            float: left;
+            margin-right: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+        }
+        
+        .dialog-content {
+            min-height: 80px;
+        }
+        
+        .dialog-text {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+        
+        .dialog-name {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 5px;
+        }
+        
+        .dialog-options {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .dialog-option {
+            padding: 8px 12px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .dialog-option:hover {
+            background-color: rgba(76, 175, 80, 0.2);
+        }
+        
+        #quest-notification {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            padding: 15px;
+            min-width: 250px;
+            transform: translateX(120%);
+            transition: transform 0.5s ease;
+            pointer-events: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        #quest-notification.show {
+            transform: translateX(0);
+        }
+        
+        .quest-title {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .quest-description {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: none;
+            pointer-events: auto;
+        }
+        
+        #joystick-container {
+            width: 120px;
+            height: 120px;
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 2px solid var(--panel-border);
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
+        }
+        
+        #joystick-knob {
+            width: 50px;
+            height: 50px;
+            background-color: rgba(76, 175, 80, 0.3);
+            border: 2px solid var(--accent-color);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        #action-button {
+            position: absolute;
+            bottom: 20px;
+            right: -80px;
+            width: 60px;
+            height: 60px;
+            background-color: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            color: var(--accent-color);
+            font-size: 24px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .stat-bar {
+            height: 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .stat-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        .health-fill {
+            background-color: #e74c3c;
+        }
+        
+        .energy-fill {
+            background-color: #3498db;
+        }
+        
+        .xp-fill {
+            background-color: #2ecc71;
+        }
+        
+        .stat-name {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        
+        .notification {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 5px;
+            padding: 10px 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-20px);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">
+            <div>Loading Park RPG Adventure...</div>
+            <div style="margin-top: 10px; font-size: 14px; opacity: 0.7;">Preparing your adventure</div>
+        </div>
+        <div class="loading-progress">
+            <div class="loading-bar" id="loading-bar"></div>
+        </div>
+    </div>
+
+    <div id="game-container"></div>
+    
+    <div id="ui-container">
+        <div id="stats-panel">
+            <div class="stat-name">
+                <span>Health</span>
+                <span id="health-value">100/100</span>
+            </div>
+            <div class="stat-bar">
+                <div class="stat-fill health-fill" style="width: 100%"></div>
+            </div>
+            
+            <div class="stat-name">
+                <span>Energy</span>
+                <span id="energy-value">100/100</span>
+            </div>
+            <div class="stat-bar">
+                <div class="stat-fill energy-fill" style="width: 100%"></div>
+            </div>
+            
+            <div class="stat-name">
+                <span>Level: <span id="level-value">1</span></span>
+                <span id="xp-value">0/100</span>
+            </div>
+            <div class="stat-bar">
+                <div class="stat-fill xp-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <div id="inventory-button">🎒</div>
+        
+        <div id="inventory-panel">
+            <h3>Inventory</h3>
+            <div class="inventory-grid">
+                <!-- Inventory items will be generated here -->
+            </div>
+        </div>
+        
+        <div id="dialog-panel">
+            <div class="dialog-portrait">👩</div>
+            <div class="dialog-content">
+                <div class="dialog-name">Park Ranger</div>
+                <div class="dialog-text">Hello adventurer! Welcome to Evergreen Park. Can I help you with something?</div>
+            </div>
+            <div class="dialog-options">
+                <div class="dialog-option">Tell me about this park</div>
+                <div class="dialog-option">Are there any tasks I can help with?</div>
+                <div class="dialog-option">No thanks, just exploring</div>
+            </div>
+        </div>
+        
+        <div id="quest-notification">
+            <div class="quest-title">New Quest: Clean the Park</div>
+            <div class="quest-description">Help the park ranger collect trash around the park. Find at least 5 pieces of trash.</div>
+        </div>
+        
+        <div id="mobile-controls">
+            <div id="joystick-container">
+                <div id="joystick-knob"></div>
+            </div>
+            <div id="action-button">A</div>
+        </div>
+        
+        <div class="notification" id="notification">Item found: Acorn</div>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            // Game settings
+            canvasWidth: window.innerWidth,
+            canvasHeight: window.innerHeight,
+            tileSize: 32,
+            
+            // World settings
+            worldWidth: 50,
+            worldHeight: 50,
+            
+            // Player settings
+            initialHealth: 100,
+            initialEnergy: 100,
+            walkingEnergyUse: 0.2,
+            runningEnergyUse: 0.6,
+            energyRegen: 0.3,
+            
+            // Movement settings
+            playerSpeed: 3,
+            playerRunSpeed: 5,
+            
+            // Game mechanics
+            interactionDistance: 2,
+            
+            // Animation settings
+            frameRate: 8,
+            
+            // Mobile detection
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        };
+        
+        // Game state
+        const gameState = {
+            player: {
+                x: 25,
+                y: 25,
+                direction: 'down',
+                health: config.initialHealth,
+                maxHealth: config.initialHealth,
+                energy: config.initialEnergy,
+                maxEnergy: config.initialEnergy,
+                xp: 0,
+                nextLevelXp: 100,
+                level: 1,
+                inventory: [],
+                isRunning: false,
+                isMoving: false,
+                animFrame: 0
+            },
+            
+            npcs: [
+                {
+                    id: 'ranger',
+                    name: 'Park Ranger',
+                    x: 22,
+                    y: 15,
+                    direction: 'down',
+                    portrait: '👩',
+                    dialog: {
+                        greeting: 'Hello adventurer! Welcome to Evergreen Park. Can I help you with something?',
+                        options: [
+                            {
+                                text: 'Tell me about this park',
+                                response: 'Evergreen Park is home to various wildlife and beautiful trees. It\'s a peaceful place, but lately we\'ve been having some issues with litter.'
+                            },
+                            {
+                                text: 'Are there any tasks I can help with?',
+                                response: 'Actually, yes! We need help cleaning up trash around the park. If you could collect at least 5 pieces of trash, that would be wonderful!',
+                                giveQuest: 'clean_park'
+                            },
+                            {
+                                text: 'No thanks, just exploring',
+                                response: 'Enjoy your walk through the park! Let me know if you need anything.'
+                            }
+                        ]
+                    },
+                    animFrame: 0
+                },
+                {
+                    id: 'gardener',
+                    name: 'Gardener',
+                    x: 35,
+                    y: 30,
+                    direction: 'up',
+                    portrait: '👨',
+                    dialog: {
+                        greeting: 'The plants are growing well this season. Do you like gardening?',
+                        options: [
+                            {
+                                text: 'Yes, I love plants!',
+                                response: 'A fellow plant enthusiast! If you find any interesting seeds during your adventure, bring them to me.'
+                            },
+                            {
+                                text: 'Not really',
+                                response: 'That\'s okay. We all have different interests. Still, nature is something we all should appreciate.'
+                            }
+                        ]
+                    },
+                    animFrame: 0
+                }
+            ],
+            
+            items: [
+                { id: 'trash1', type: 'trash', x: 18, y: 22, icon: '🗑️', name: 'Trash', description: 'A piece of trash that needs to be properly disposed of.' },
+                { id: 'trash2', type: 'trash', x: 32, y: 18, icon: '🗑️', name: 'Trash', description: 'A piece of trash that needs to be properly disposed of.' },
+                { id: 'trash3', type: 'trash', x: 40, y: 25, icon: '🗑️', name: 'Trash', description: 'A piece of trash that needs to be properly disposed of.' },
+                { id: 'trash4', type: 'trash', x: 28, y: 35, icon: '🗑️', name: 'Trash', description: 'A piece of trash that needs to be properly disposed of.' },
+                { id: 'trash5', type: 'trash', x: 15, y: 30, icon: '🗑️', name: 'Trash', description: 'A piece of trash that needs to be properly disposed of.' },
+                { id: 'trash6', type: 'trash', x: 22, y: 27, icon: '🗑️', name: 'Trash', description: 'A piece of trash that needs to be properly disposed of.' },
+                { id: 'acorn1', type: 'seed', x: 12, y: 15, icon: '🌰', name: 'Acorn', description: 'A seed from an oak tree. The gardener might be interested in this.' },
+                { id: 'acorn2', type: 'seed', x: 36, y: 22, icon: '🌰', name: 'Acorn', description: 'A seed from an oak tree. The gardener might be interested in this.' },
+                { id: 'berries', type: 'food', x: 42, y: 15, icon: '🍓', name: 'Wild Berries', description: 'Sweet berries that restore 10 health when eaten.' },
+                { id: 'apple', type: 'food', x: 28, y: 10, icon: '🍎', name: 'Apple', description: 'A juicy apple that restores 15 health when eaten.' }
+            ],
+            
+            quests: [
+                {
+                    id: 'clean_park',
+                    title: 'Clean the Park',
+                    description: 'Help the park ranger collect trash around the park. Find at least 5 pieces of trash.',
+                    isActive: false,
+                    isCompleted: false,
+                    requiredType: 'trash',
+                    requiredCount: 5,
+                    currentCount: 0,
+                    rewardXp: 50
+                }
+            ],
+            
+            world: {
+                tiles: [],
+                objects: [
+                    { type: 'tree', x: 10, y: 10, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 15, y: 12, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 20, y: 8, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 25, y: 15, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 30, y: 12, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 35, y: 10, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 40, y: 15, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 12, y: 20, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 18, y: 25, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 25, y: 30, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 32, y: 28, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 38, y: 22, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 8, y: 35, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 15, y: 38, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 22, y: 40, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 30, y: 42, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 36, y: 38, icon: '🌳', obstacle: true },
+                    { type: 'tree', x: 42, y: 32, icon: '🌳', obstacle: true },
+                    { type: 'pine', x: 5, y: 15, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 12, y: 8, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 28, y: 5, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 38, y: 7, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 45, y: 12, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 6, y: 28, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 14, y: 32, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 35, y: 33, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 44, y: 25, icon: '🌲', obstacle: true },
+                    { type: 'pine', x: 20, y: 42, icon: '🌲', obstacle: true },
+                    { type: 'flower', x: 14, y: 14, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 22, y: 18, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 30, y: 16, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 33, y: 22, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 26, y: 28, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 18, y: 35, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 36, y: 32, icon: '🌼', obstacle: false },
+                    { type: 'flower', x: 15, y: 25, icon: '🌻', obstacle: false },
+                    { type: 'flower', x: 24, y: 22, icon: '🌻', obstacle: false },
+                    { type: 'flower', x: 32, y: 26, icon: '🌻', obstacle: false },
+                    { type: 'flower', x: 28, y: 32, icon: '🌻', obstacle: false },
+                    { type: 'flower', x: 20, y: 30, icon: '🌻', obstacle: false },
+                    { type: 'rock', x: 8, y: 20, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 16, y: 22, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 28, y: 18, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 34, y: 12, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 40, y: 20, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 10, y: 32, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 22, y: 36, icon: '🪨', obstacle: true },
+                    { type: 'rock', x: 36, y: 28, icon: '🪨', obstacle: true },
+                    { type: 'bush', x: 12, y: 18, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 20, y: 16, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 26, y: 12, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 32, y: 8, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 38, y: 14, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 14, y: 28, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 24, y: 32, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 30, y: 38, icon: '🌿', obstacle: true },
+                    { type: 'bush', x: 38, y: 36, icon: '🌿', obstacle: true },
+                    { type: 'bench', x: 20, y: 22, icon: '🪑', obstacle: true },
+                    { type: 'bench', x: 30, y: 22, icon: '🪑', obstacle: true },
+                    { type: 'bench', x: 18, y: 30, icon: '🪑', obstacle: true },
+                    { type: 'bench', x: 32, y: 34, icon: '🪑', obstacle: true },
+                    { type: 'pond', x: 25, y: 18, icon: '💦', obstacle: true },
+                    { type: 'pond', x: 26, y: 18, icon: '💦', obstacle: true },
+                    { type: 'pond', x: 25, y: 19, icon: '💦', obstacle: true },
+                    { type: 'pond', x: 26, y: 19, icon: '💦', obstacle: true }
+                ]
+            },
+            
+            camera: {
+                x: 0,
+                y: 0,
+                width: 15,
+                height: 15
+            },
+            
+            ui: {
+                isInventoryOpen: false,
+                isDialogOpen: false,
+                currentDialog: null,
+                activeQuests: []
+            },
+            
+            input: {
+                up: false,
+                down: false,
+                left: false,
+                right: false,
+                action: false,
+                run: false,
+                joystick: { active: false, angle: 0, power: 0 }
+            },
+            
+            // Time tracking
+            lastFrameTime: 0,
+            animationTimer: 0
+        };
+        
+        // Game canvas and context
+        let gameCanvas, gameContext;
+        
+        // Initialize the game
+        function initGame() {
+            // Simulate loading progress
+            simulateLoading();
+            
+            // Create game canvas
+            gameCanvas = document.createElement('canvas');
+            gameCanvas.width = config.canvasWidth;
+            gameCanvas.height = config.canvasHeight;
+            gameContext = gameCanvas.getContext('2d');
+            
+            // Append canvas to game container
+            document.getElementById('game-container').appendChild(gameCanvas);
+            
+            // Generate world tiles
+            generateWorld();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Initialize UI
+            initUI();
+            
+            // Set up mobile controls if needed
+            if (config.isMobile) {
+                setupMobileControls();
+            }
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Simulate loading for a better user experience
+        function simulateLoading() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 8;
+                
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, 500);
+                }
+                
+                document.getElementById('loading-bar').style.width = progress + '%';
+            }, 200);
+        }
+        
+        // Generate world tiles
+        function generateWorld() {
+            // Create grass tiles for the entire world
+            gameState.world.tiles = [];
+            
+            for (let y = 0; y < config.worldHeight; y++) {
+                const row = [];
+                
+                for (let x = 0; x < config.worldWidth; x++) {
+                    // Randomize slightly which grass tile to use
+                    const tileVariant = Math.random() < 0.8 ? '🟩' : (Math.random() < 0.5 ? '🌱' : '🍀');
+                    row.push({ type: 'grass', icon: tileVariant });
+                }
+                
+                gameState.world.tiles.push(row);
+            }
+        }
+        
+        // Set up event listeners
+        function setupEventListeners() {
+            // Keyboard events
+            window.addEventListener('keydown', (e) => {
+                switch (e.key) {
+                    case 'w':
+                    case 'ArrowUp':
+                        gameState.input.up = true;
+                        break;
+                    case 's':
+                    case 'ArrowDown':
+                        gameState.input.down = true;
+                        break;
+                    case 'a':
+                    case 'ArrowLeft':
+                        gameState.input.left = true;
+                        break;
+                    case 'd':
+                    case 'ArrowRight':
+                        gameState.input.right = true;
+                        break;
+                    case 'e':
+                    case ' ':
+                        gameState.input.action = true;
+                        handleAction();
+                        break;
+                    case 'Shift':
+                        gameState.input.run = true;
+                        break;
+                    case 'i':
+                        toggleInventory();
+                        break;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                switch (e.key) {
+                    case 'w':
+                    case 'ArrowUp':
+                        gameState.input.up = false;
+                        break;
+                    case 's':
+                    case 'ArrowDown':
+                        gameState.input.down = false;
+                        break;
+                    case 'a':
+                    case 'ArrowLeft':
+                        gameState.input.left = false;
+                        break;
+                    case 'd':
+                    case 'ArrowRight':
+                        gameState.input.right = false;
+                        break;
+                    case 'e':
+                    case ' ':
+                        gameState.input.action = false;
+                        break;
+                    case 'Shift':
+                        gameState.input.run = false;
+                        break;
+                }
+            });
+            
+            // Window resize event
+            window.addEventListener('resize', () => {
+                config.canvasWidth = window.innerWidth;
+                config.canvasHeight = window.innerHeight;
+                
+                gameCanvas.width = config.canvasWidth;
+                gameCanvas.height = config.canvasHeight;
+                
+                // Adjust camera size based on new dimensions
+                gameState.camera.width = Math.min(15, Math.floor(config.canvasWidth / config.tileSize));
+                gameState.camera.height = Math.min(15, Math.floor(config.canvasHeight / config.tileSize));
+            });
+            
+            // UI element event listeners
+            document.getElementById('inventory-button').addEventListener('click', toggleInventory);
+        }
+        
+        // Initialize UI elements
+        function initUI() {
+            // Initialize inventory
+            updateInventoryUI();
+            
+            // Initialize dialog options
+            const dialogOptions = document.querySelectorAll('.dialog-option');
+            dialogOptions.forEach((option, index) => {
+                option.addEventListener('click', () => handleDialogOption(index));
+            });
+            
+            // Update stats display
+            updateStatsUI();
+        }
+        
+        // Set up mobile controls
+        function setupMobileControls() {
+            const mobileControls = document.getElementById('mobile-controls');
+            mobileControls.style.display = 'block';
+            
+            const joystickContainer = document.getElementById('joystick-container');
+            const joystickKnob = document.getElementById('joystick-knob');
+            const actionButton = document.getElementById('action-button');
+            
+            // Joystick touch events
+            joystickContainer.addEventListener('touchstart', handleJoystickStart);
+            joystickContainer.addEventListener('touchmove', handleJoystickMove);
+            joystickContainer.addEventListener('touchend', handleJoystickEnd);
+            
+            // Action button
+            actionButton.addEventListener('touchstart', () => {
+                gameState.input.action = true;
+                handleAction();
+            });
+            
+            actionButton.addEventListener('touchend', () => {
+                gameState.input.action = false;
+            });
+            
+            function handleJoystickStart(e) {
+                e.preventDefault();
+                gameState.input.joystick.active = true;
+                updateJoystickPosition(e.touches[0]);
+            }
+            
+            function handleJoystickMove(e) {
+                e.preventDefault();
+                if (gameState.input.joystick.active) {
+                    updateJoystickPosition(e.touches[0]);
+                }
+            }
+            
+            function handleJoystickEnd() {
+                gameState.input.joystick.active = false;
+                gameState.input.joystick.power = 0;
+                joystickKnob.style.transform = 'translate(-50%, -50%)';
+                
+                // Reset movement
+                gameState.input.up = false;
+                gameState.input.down = false;
+                gameState.input.left = false;
+                gameState.input.right = false;
+            }
+            
+            function updateJoystickPosition(touch) {
+                const joystickRect = joystickContainer.getBoundingClientRect();
+                const centerX = joystickRect.width / 2;
+                const centerY = joystickRect.height / 2;
+                
+                // Calculate direction vector from center to touch
+                const touchX = touch.clientX - joystickRect.left;
+                const touchY = touch.clientY - joystickRect.top;
+                
+                let deltaX = touchX - centerX;
+                let deltaY = touchY - centerY;
+                
+                // Calculate distance from center (power)
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const maxDistance = joystickRect.width / 2 - 25; // Adjust for knob radius
+                
+                // Normalize and clamp
+                gameState.input.joystick.power = Math.min(distance / maxDistance, 1.0);
+                
+                // Calculate angle in radians
+                gameState.input.joystick.angle = Math.atan2(deltaY, deltaX);
+                
+                // If beyond max distance, clamp position to the circle edge
+                if (distance > maxDistance) {
+                    deltaX = (deltaX / distance) * maxDistance;
+                    deltaY = (deltaY / distance) * maxDistance;
+                }
+                
+                // Update knob position
+                joystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+                
+                // Set movement based on angle quadrant
+                const angle = gameState.input.joystick.angle;
+                
+                // Reset all movement
+                gameState.input.up = false;
+                gameState.input.down = false;
+                gameState.input.left = false;
+                gameState.input.right = false;
+                
+                // Determine the main direction based on angle
+                if (gameState.input.joystick.power > 0.3) {
+                    if (angle > -Math.PI/4 && angle < Math.PI/4) {
+                        gameState.input.right = true;
+                    } else if (angle >= Math.PI/4 && angle < 3*Math.PI/4) {
+                        gameState.input.down = true;
+                    } else if ((angle >= 3*Math.PI/4 && angle <= Math.PI) || (angle >= -Math.PI && angle < -3*Math.PI/4)) {
+                        gameState.input.left = true;
+                    } else if (angle >= -3*Math.PI/4 && angle < -Math.PI/4) {
+                        gameState.input.up = true;
+                    }
+                    
+                    // Enable running if power is high
+                    gameState.input.run = gameState.input.joystick.power > 0.8;
+                }
+            }
+        }
+        
+        // Game loop
+        function gameLoop(timestamp) {
+            // Calculate delta time
+            const deltaTime = (timestamp - gameState.lastFrameTime) / 1000;
+            gameState.lastFrameTime = timestamp;
+            
+            // Update animation timer
+            gameState.animationTimer += deltaTime;
+            if (gameState.animationTimer >= 1 / config.frameRate) {
+                gameState.animationTimer = 0;
+                updateAnimations();
+            }
+            
+            // Update game state
+            update(deltaTime);
+            
+            // Render game
+            render();
+            
+            // Request next frame
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Update game state
+        function update(deltaTime) {
+            // Skip updates if dialog is open
+            if (gameState.ui.isDialogOpen) {
+                return;
+            }
+            
+            // Update player movement
+            updatePlayerMovement(deltaTime);
+            
+            // Update camera position
+            updateCamera();
+            
+            // Update player stats
+            updatePlayerStats(deltaTime);
+            
+            // Check for item pickups
+            checkItemPickups();
+            
+            // Check NPC interactions
+            checkNPCInteractions();
+            
+            // Update quests
+            updateQuests();
+        }
+        
+        // Update player movement
+        function updatePlayerMovement(deltaTime) {
+            // Determine if player is moving
+            gameState.player.isMoving = gameState.input.up || gameState.input.down || gameState.input.left || gameState.input.right;
+            
+            // Determine if player is running
+            gameState.player.isRunning = gameState.player.isMoving && gameState.input.run && gameState.player.energy > 0;
+            
+            // Calculate movement speed
+            const speed = (gameState.player.isRunning ? config.playerRunSpeed : config.playerSpeed) * deltaTime;
+            
+            // Calculate next position
+            let nextX = gameState.player.x;
+            let nextY = gameState.player.y;
+            
+            if (gameState.input.up) {
+                nextY -= speed;
+                gameState.player.direction = 'up';
+            } else if (gameState.input.down) {
+                nextY += speed;
+                gameState.player.direction = 'down';
+            }
+            
+            if (gameState.input.left) {
+                nextX -= speed;
+                gameState.player.direction = 'left';
+            } else if (gameState.input.right) {
+                nextX += speed;
+                gameState.player.direction = 'right';
+            }
+            
+            // Check collisions and update position
+            if (!checkCollision(nextX, gameState.player.y)) {
+                gameState.player.x = nextX;
+            }
+            
+            if (!checkCollision(gameState.player.x, nextY)) {
+                gameState.player.y = nextY;
+            }
+            
+            // Ensure player stays within world bounds
+            gameState.player.x = Math.max(0, Math.min(config.worldWidth - 1, gameState.player.x));
+            gameState.player.y = Math.max(0, Math.min(config.worldHeight - 1, gameState.player.y));
+            
+            // Use energy when running
+            if (gameState.player.isMoving) {
+                if (gameState.player.isRunning) {
+                    gameState.player.energy -= config.runningEnergyUse;
+                    if (gameState.player.energy <= 0) {
+                        gameState.player.energy = 0;
+                        gameState.player.isRunning = false;
+                    }
+                } else {
+                    gameState.player.energy -= config.walkingEnergyUse;
+                    if (gameState.player.energy < 0) {
+                        gameState.player.energy = 0;
+                    }
+                }
+            }
+        }
+        
+        // Check collision with world objects
+        function checkCollision(x, y) {
+            // World boundary check
+            if (x < 0 || x >= config.worldWidth || y < 0 || y >= config.worldHeight) {
+                return true;
+            }
+            
+            // Check for obstacles
+            for (const obj of gameState.world.objects) {
+                if (obj.obstacle && Math.abs(obj.x - x) < 0.7 && Math.abs(obj.y - y) < 0.7) {
+                    return true;
+                }
+            }
+            
+            // Check for NPCs
+            for (const npc of gameState.npcs) {
+                if (Math.abs(npc.x - x) < 0.7 && Math.abs(npc.y - y) < 0.7) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        // Update camera position to follow player
+        function updateCamera() {
+            gameState.camera.x = Math.floor(gameState.player.x) - Math.floor(gameState.camera.width / 2);
+            gameState.camera.y = Math.floor(gameState.player.y) - Math.floor(gameState.camera.height / 2);
+            
+            // Limit camera to world bounds
+            gameState.camera.x = Math.max(0, Math.min(config.worldWidth - gameState.camera.width, gameState.camera.x));
+            gameState.camera.y = Math.max(0, Math.min(config.worldHeight - gameState.camera.height, gameState.camera.y));
+        }
+        
+        // Update player stats
+        function updatePlayerStats(deltaTime) {
+            // Regenerate energy when not running
+            if (!gameState.player.isRunning) {
+                gameState.player.energy += config.energyRegen * deltaTime;
+                if (gameState.player.energy > gameState.player.maxEnergy) {
+                    gameState.player.energy = gameState.player.maxEnergy;
+                }
+            }
+            
+            // Update UI
+            updateStatsUI();
+        }
+        
+        // Update animations
+        function updateAnimations() {
+            // Update player animation frame
+            if (gameState.player.isMoving) {
+                gameState.player.animFrame = (gameState.player.animFrame + 1) % 2;
+            } else {
+                gameState.player.animFrame = 0;
+            }
+            
+            // Update NPC animation frames
+            for (const npc of gameState.npcs) {
+                npc.animFrame = (npc.animFrame + 1) % 2;
+            }
+        }
+        
+        // Check for item pickups
+        function checkItemPickups() {
+            for (let i = gameState.items.length - 1; i >= 0; i--) {
+                const item = gameState.items[i];
+                
+                // Check if player is close enough to item
+                if (Math.abs(gameState.player.x - item.x) < 0.5 && Math.abs(gameState.player.y - item.y) < 0.5) {
+                    // Add item to inventory
+                    gameState.player.inventory.push(item);
+                    
+                    // Remove item from world
+                    gameState.items.splice(i, 1);
+                    
+                    // Update inventory UI
+                    updateInventoryUI();
+                    
+                    // Show notification
+                    showNotification(`Item found: ${item.name}`);
+                    
+                    // Update quest progress if applicable
+                    updateQuestProgress(item);
+                }
+            }
+        }
+        
+        // Check for NPC interactions
+        function checkNPCInteractions() {
+            if (!gameState.input.action) return;
+            
+            for (const npc of gameState.npcs) {
+                // Check if player is close enough to interact
+                const distance = Math.sqrt(
+                    Math.pow(gameState.player.x - npc.x, 2) + 
+                    Math.pow(gameState.player.y - npc.y, 2)
+                );
+                
+                if (distance <= config.interactionDistance) {
+                    // Start dialog
+                    showDialog(npc);
+                    
+                    // Clear action input to prevent multiple interactions
+                    gameState.input.action = false;
+                    return;
+                }
+            }
+        }
+        
+        // Handle action button press
+        function handleAction() {
+            // Check for NPC interactions
+            checkNPCInteractions();
+            
+            // Check for dialog responses
+            if (gameState.ui.isDialogOpen) {
+                // Close dialog if open
+                hideDialog();
+            }
+        }
+        
+        // Update quests
+        function updateQuests() {
+            // Check for completed quests
+            for (const quest of gameState.quests) {
+                if (quest.isActive && !quest.isCompleted && quest.currentCount >= quest.requiredCount) {
+                    completeQuest(quest);
+                }
+            }
+        }
+        
+        // Update quest progress
+        function updateQuestProgress(item) {
+            for (const quest of gameState.quests) {
+                if (quest.isActive && !quest.isCompleted && item.type === quest.requiredType) {
+                    quest.currentCount++;
+                    
+                    // Show updated progress
+                    showNotification(`Quest progress: ${quest.currentCount}/${quest.requiredCount}`);
+                }
+            }
+        }
+        
+        // Complete a quest
+        function completeQuest(quest) {
+            quest.isCompleted = true;
+            
+            // Give rewards
+            gameState.player.xp += quest.rewardXp;
+            
+            // Check if player leveled up
+            checkLevelUp();
+            
+            // Update UI
+            updateStatsUI();
+            
+            // Show notification
+            showNotification(`Quest completed: ${quest.title}! +${quest.rewardXp} XP`);
+        }
+        
+        // Check if player should level up
+        function checkLevelUp() {
+            if (gameState.player.xp >= gameState.player.nextLevelXp) {
+                gameState.player.level++;
+                
+                // Calculate leftover XP
+                const leftoverXP = gameState.player.xp - gameState.player.nextLevelXp;
+                
+                // Set new XP thresholds
+                gameState.player.xp = leftoverXP;
+                gameState.player.nextLevelXp = Math.floor(gameState.player.nextLevelXp * 1.5);
+                
+                // Increase stats
+                gameState.player.maxHealth += 10;
+                gameState.player.health = gameState.player.maxHealth;
+                gameState.player.maxEnergy += 10;
+                gameState.player.energy = gameState.player.maxEnergy;
+                
+                // Show notification
+                showNotification(`Level Up! You are now level ${gameState.player.level}`);
+            }
+        }
+        
+        // Render the game
+        function render() {
+            // Clear canvas
+            gameContext.clearRect(0, 0, config.canvasWidth, config.canvasHeight);
+            
+            // Calculate tile size based on canvas dimensions
+            const tileSize = Math.min(
+                config.canvasWidth / gameState.camera.width,
+                config.canvasHeight / gameState.camera.height
+            );
+            
+            // Render world tiles
+            renderTiles(tileSize);
+            
+            // Render world objects
+            renderObjects(tileSize);
+            
+            // Render items
+            renderItems(tileSize);
+            
+            // Render NPCs
+            renderNPCs(tileSize);
+            
+            // Render player
+            renderPlayer(tileSize);
+        }
+        
+        // Render world tiles
+        function renderTiles(tileSize) {
+            for (let y = 0; y < gameState.camera.height; y++) {
+                for (let x = 0; x < gameState.camera.width; x++) {
+                    const worldX = gameState.camera.x + x;
+                    const worldY = gameState.camera.y + y;
+                    
+                    if (worldX >= 0 && worldX < config.worldWidth && worldY >= 0 && worldY < config.worldHeight) {
+                        const tile = gameState.world.tiles[worldY][worldX];
+                        
+                        // Calculate position
+                        const screenX = x * tileSize;
+                        const screenY = y * tileSize;
+                        
+                        // Draw tile
+                        gameContext.font = `${tileSize}px Arial`;
+                        gameContext.fillText(tile.icon, screenX, screenY + tileSize);
+                    }
+                }
+            }
+        }
+        
+        // Render world objects
+        function renderObjects(tileSize) {
+            for (const obj of gameState.world.objects) {
+                // Check if object is in view
+                if (
+                    obj.x >= gameState.camera.x && obj.x < gameState.camera.x + gameState.camera.width &&
+                    obj.y >= gameState.camera.y && obj.y < gameState.camera.y + gameState.camera.height
+                ) {
+                    // Calculate screen position
+                    const screenX = (obj.x - gameState.camera.x) * tileSize;
+                    const screenY = (obj.y - gameState.camera.y) * tileSize;
+                    
+                    // Draw object
+                    gameContext.font = `${tileSize}px Arial`;
+                    gameContext.fillText(obj.icon, screenX, screenY + tileSize);
+                }
+            }
+        }
+        
+        // Render items
+        function renderItems(tileSize) {
+            for (const item of gameState.items) {
+                // Check if item is in view
+                if (
+                    item.x >= gameState.camera.x && item.x < gameState.camera.x + gameState.camera.width &&
+                    item.y >= gameState.camera.y && item.y < gameState.camera.y + gameState.camera.height
+                ) {
+                    // Calculate screen position
+                    const screenX = (item.x - gameState.camera.x) * tileSize;
+                    const screenY = (item.y - gameState.camera.y) * tileSize;
+                    
+                    // Draw item with slight bounce animation
+                    const bounceOffset = Math.sin(Date.now() / 500) * 5;
+                    gameContext.font = `${tileSize * 0.8}px Arial`;
+                    gameContext.fillText(item.icon, screenX + tileSize * 0.1, screenY + tileSize * 0.9 + bounceOffset);
+                }
+            }
+        }
+        
+        // Render NPCs
+        function renderNPCs(tileSize) {
+            for (const npc of gameState.npcs) {
+                // Check if NPC is in view
+                if (
+                    npc.x >= gameState.camera.x && npc.x < gameState.camera.x + gameState.camera.width &&
+                    npc.y >= gameState.camera.y && npc.y < gameState.camera.y + gameState.camera.height
+                ) {
+                    // Calculate screen position
+                    const screenX = (npc.x - gameState.camera.x) * tileSize;
+                    const screenY = (npc.y - gameState.camera.y) * tileSize;
+                    
+                    // Get appropriate emoji for direction and animation frame
+                    let emoji;
+                    switch (npc.direction) {
+                        case 'up':
+                            emoji = npc.animFrame === 0 ? '👨' : '👨‍🦰';
+                            break;
+                        case 'down':
+                            emoji = npc.animFrame === 0 ? '👨' : '👨‍🦰';
+                            break;
+                        case 'left':
+                            emoji = npc.animFrame === 0 ? '👨' : '👨‍🦰';
+                            break;
+                        case 'right':
+                            emoji = npc.animFrame === 0 ? '👨' : '👨‍🦰';
+                            break;
+                    }
+                    
+                    // Draw NPC
+                    gameContext.font = `${tileSize}px Arial`;
+                    gameContext.fillText(emoji, screenX, screenY + tileSize);
+                    
+                    // Draw interaction indicator if player is nearby
+                    const distance = Math.sqrt(
+                        Math.pow(gameState.player.x - npc.x, 2) + 
+                        Math.pow(gameState.player.y - npc.y, 2)
+                    );
+                    
+                    if (distance <= config.interactionDistance) {
+                        const indicatorOffset = Math.sin(Date.now() / 300) * 5;
+                        gameContext.font = `${tileSize * 0.4}px Arial`;
+                        gameContext.fillText('💬', screenX + tileSize * 0.3, screenY - indicatorOffset);
+                    }
+                }
+            }
+        }
+        
+        // Render player
+        function renderPlayer(tileSize) {
+            // Calculate screen position (centered in view)
+            const screenX = (gameState.player.x - gameState.camera.x) * tileSize;
+            const screenY = (gameState.player.y - gameState.camera.y) * tileSize;
+            
+            // Get appropriate emoji for direction and animation frame
+            let emoji;
+            switch (gameState.player.direction) {
+                case 'up':
+                    emoji = gameState.player.animFrame === 0 ? '🧑' : '👤';
+                    break;
+                case 'down':
+                    emoji = gameState.player.animFrame === 0 ? '🧑' : '👤';
+                    break;
+                case 'left':
+                    emoji = gameState.player.animFrame === 0 ? '🧑' : '👤';
+                    break;
+                case 'right':
+                    emoji = gameState.player.animFrame === 0 ? '🧑' : '👤';
+                    break;
+            }
+            
+            // Draw player
+            gameContext.font = `${tileSize}px Arial`;
+            gameContext.fillText(emoji, screenX, screenY + tileSize);
+        }
+        
+        // Update stats UI
+        function updateStatsUI() {
+            // Update health
+            document.getElementById('health-value').textContent = `${Math.floor(gameState.player.health)}/${gameState.player.maxHealth}`;
+            document.querySelector('.health-fill').style.width = `${(gameState.player.health / gameState.player.maxHealth) * 100}%`;
+            
+            // Update energy
+            document.getElementById('energy-value').textContent = `${Math.floor(gameState.player.energy)}/${gameState.player.maxEnergy}`;
+            document.querySelector('.energy-fill').style.width = `${(gameState.player.energy / gameState.player.maxEnergy) * 100}%`;
+            
+            // Update level and XP
+            document.getElementById('level-value').textContent = gameState.player.level;
+            document.getElementById('xp-value').textContent = `${Math.floor(gameState.player.xp)}/${gameState.player.nextLevelXp}`;
+            document.querySelector('.xp-fill').style.width = `${(gameState.player.xp / gameState.player.nextLevelXp) * 100}%`;
+        }
+        
+        // Update inventory UI
+        function updateInventoryUI() {
+            const inventoryGrid = document.querySelector('.inventory-grid');
+            inventoryGrid.innerHTML = '';
+            
+            // Add items to grid
+            for (const item of gameState.player.inventory) {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'inventory-item';
+                itemElement.textContent = item.icon;
+                itemElement.title = `${item.name}: ${item.description}`;
+                
+                // Add click event for item use
+                itemElement.addEventListener('click', () => useItem(item));
+                
+                inventoryGrid.appendChild(itemElement);
+            }
+            
+            // Add empty slots
+            const emptySlots = 12 - gameState.player.inventory.length;
+            for (let i = 0; i < emptySlots; i++) {
+                const emptySlot = document.createElement('div');
+                emptySlot.className = 'inventory-item';
+                inventoryGrid.appendChild(emptySlot);
+            }
+        }
+        
+        // Use an item
+        function useItem(item) {
+            switch (item.type) {
+                case 'food':
+                    // Restore health
+                    if (item.name === 'Apple') {
+                        gameState.player.health += 15;
+                    } else if (item.name === 'Wild Berries') {
+                        gameState.player.health += 10;
+                    }
+                    
+                    // Cap health at max
+                    if (gameState.player.health > gameState.player.maxHealth) {
+                        gameState.player.health = gameState.player.maxHealth;
+                    }
+                    
+                    // Show notification
+                    showNotification(`Used ${item.name}!`);
+                    
+                    // Remove item from inventory
+                    const itemIndex = gameState.player.inventory.indexOf(item);
+                    if (itemIndex !== -1) {
+                        gameState.player.inventory.splice(itemIndex, 1);
+                    }
+                    
+                    // Update UI
+                    updateInventoryUI();
+                    updateStatsUI();
+                    break;
+                    
+                default:
+                    // Show notification for non-usable items
+                    showNotification(`Cannot use ${item.name} here.`);
+                    break;
+            }
+        }
+        
+        // Toggle inventory panel
+        function toggleInventory() {
+            gameState.ui.isInventoryOpen = !gameState.ui.isInventoryOpen;
+            document.getElementById('inventory-panel').style.display = gameState.ui.isInventoryOpen ? 'block' : 'none';
+        }
+        
+        // Show dialog with NPC
+        function showDialog(npc) {
+            gameState.ui.isDialogOpen = true;
+            gameState.ui.currentDialog = npc;
+            
+            const dialogPanel = document.getElementById('dialog-panel');
+            const dialogPortrait = document.querySelector('.dialog-portrait');
+            const dialogName = document.querySelector('.dialog-name');
+            const dialogText = document.querySelector('.dialog-text');
+            const dialogOptions = document.querySelector('.dialog-options');
+            
+            // Set dialog content
+            dialogPortrait.textContent = npc.portrait;
+            dialogName.textContent = npc.name;
+            dialogText.textContent = npc.dialog.greeting;
+            
+            // Set dialog options
+            dialogOptions.innerHTML = '';
+            npc.dialog.options.forEach(option => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'dialog-option';
+                optionElement.textContent = option.text;
+                dialogOptions.appendChild(optionElement);
+            });
+            
+            // Show dialog panel
+            dialogPanel.style.display = 'block';
+            
+            // Add event listeners to options
+            const optionElements = document.querySelectorAll('.dialog-option');
+            optionElements.forEach((element, index) => {
+                element.addEventListener('click', () => handleDialogOption(index));
+            });
+        }
+        
+        // Handle dialog option click
+        function handleDialogOption(index) {
+            if (!gameState.ui.currentDialog) return;
+            
+            const npc = gameState.ui.currentDialog;
+            const option = npc.dialog.options[index];
+            
+            if (option) {
+                // Update dialog text
+                document.querySelector('.dialog-text').textContent = option.response;
+                
+                // Check if option gives a quest
+                if (option.giveQuest) {
+                    const quest = gameState.quests.find(q => q.id === option.giveQuest);
+                    if (quest && !quest.isActive && !quest.isCompleted) {
+                        quest.isActive = true;
+                        gameState.ui.activeQuests.push(quest);
+                        
+                        // Show quest notification
+                        showQuestNotification(quest);
+                    }
+                }
+                
+                // Hide dialog options
+                document.querySelector('.dialog-options').innerHTML = 
+                    '<div class="dialog-option">Goodbye</div>';
+                
+                // Update event listener
+                document.querySelector('.dialog-option').addEventListener('click', hideDialog);
+            }
+        }
+        
+        // Hide dialog
+        function hideDialog() {
+            gameState.ui.isDialogOpen = false;
+            document.getElementById('dialog-panel').style.display = 'none';
+            gameState.ui.currentDialog = null;
+        }
+        
+        // Show quest notification
+        function showQuestNotification(quest) {
+            const notification = document.getElementById('quest-notification');
+            const title = notification.querySelector('.quest-title');
+            const description = notification.querySelector('.quest-description');
+            
+            title.textContent = `New Quest: ${quest.title}`;
+            description.textContent = quest.description;
+            
+            notification.classList.add('show');
+            
+            // Hide notification after a delay
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 5000);
+        }
+        
+        // Show notification
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            // Hide notification after a delay
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Start the game when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
