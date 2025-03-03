@@ -378,8 +378,8 @@
                 updateWeatherParameters();
             }
             
-            // Randomly change weather every few minutes
-            if (!gameState.weather.transitionActive && Math.random() < 0.0005) {
+            // Randomly change weather much less frequently (reduced by factor of 10)
+            if (!gameState.weather.transitionActive && Math.random() < 0.00005) {
                 startWeatherTransition();
             }
             
@@ -1247,6 +1247,10 @@
                     // Format description with line breaks
                     contentEl.innerHTML = obj.content.description.replace(/\n/g, '<br>');
                     
+                    // Clear any existing action buttons before adding new ones
+                    const existingButtons = contentEl.querySelectorAll('.action-btn');
+                    existingButtons.forEach(btn => btn.remove());
+                    
                     // Add action buttons if any
                     if (obj.content.actions && obj.content.actions.length > 0) {
                         // Add action buttons
@@ -1262,10 +1266,13 @@
                             actionBtn.style.padding = '8px 15px';
                             actionBtn.style.borderRadius = '15px';
                             actionBtn.style.cursor = 'pointer';
-                            actionBtn.onclick = () => {
+                            
+                            // Use addEventListener instead of direct onclick assignment
+                            actionBtn.addEventListener('click', function() {
                                 if (obj.action) obj.action();
                                 dialogEl.style.display = 'none';
-                            };
+                            });
+                            
                             contentEl.appendChild(document.createElement('br'));
                             contentEl.appendChild(actionBtn);
                         });
@@ -1274,10 +1281,26 @@
                     // Show dialog
                     dialogEl.style.display = 'block';
                     
-                    // Setup close button
-                    document.getElementById('dialog-close').onclick = () => {
+                    // Setup close button with addEventListener
+                    const closeBtn = document.getElementById('dialog-close');
+                    
+                    // Remove any existing event listeners
+                    const newCloseBtn = closeBtn.cloneNode(true);
+                    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+                    
+                    // Add new event listener
+                    newCloseBtn.addEventListener('click', function() {
                         dialogEl.style.display = 'none';
+                    });
+                    
+                    // Add keyboard escape key to close dialog
+                    const escKeyHandler = function(e) {
+                        if (e.key === 'Escape') {
+                            dialogEl.style.display = 'none';
+                            document.removeEventListener('keydown', escKeyHandler);
+                        }
                     };
+                    document.addEventListener('keydown', escKeyHandler);
                     
                     return true;
                 }
@@ -1324,8 +1347,8 @@
                 // Make clouds visible when there's cloud cover
                 cloud.visible = cloudCover > 0.1;
                 
-                // Move clouds slowly
-                cloud.position.x += 0.05;
+                // Move clouds slowly - reduced speed for more natural movement
+                cloud.position.x += 0.02;
                 if (cloud.position.x > 100) cloud.position.x = -100;
                 
                 // Set cloud opacity
@@ -2142,8 +2165,13 @@
                 case 'w': // Change weather (for testing)
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault(); // Don't trigger browser save
-                        startWeatherTransition();
-                        showMessage("Weather changing...");
+                        // Fix manual weather change
+                        if (!gameState.weather.transitionActive) {
+                            startWeatherTransition();
+                            showMessage("Weather changing...");
+                        } else {
+                            showMessage("Weather already changing...");
+                        }
                     }
                     break;
                 case 't': // Change time faster (for testing)
