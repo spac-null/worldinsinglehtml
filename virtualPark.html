@@ -1282,9 +1282,17 @@
                         document.getElementById('interaction-dialog').style.display = 'none';
                     };
                     
-                    // 2. Direct close button handler with global function
+                    // 2. Direct close button handler - hardcode with direct function
                     const closeButton = document.getElementById('dialog-close');
-                    closeButton.onclick = window.closeInteractionDialog;
+                    // Remove existing click handlers and replace with new button
+                    const newCloseButton = closeButton.cloneNode(true);
+                    closeButton.parentNode.replaceChild(newCloseButton, closeButton);
+                    
+                    // Use inline handler
+                    newCloseButton.onclick = function() {
+                        document.getElementById('interaction-dialog').style.display = 'none';
+                        return false;
+                    };
                     
                     // 3. Background click handler
                     dialogEl.onclick = function(e) {
