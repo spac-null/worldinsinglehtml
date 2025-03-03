@@ -1554,9 +1554,11 @@
             createFallbackSky();
         }
         
-        // Create a simple skybox as fallback
+        // Create a simple skybox with stars for nighttime
         function createFallbackSky() {
-            console.log("Creating fallback sky");
+            console.log("Creating fallback sky with stars");
+            
+            // Main sky dome
             const skyGeo = new THREE.SphereGeometry(400, 32, 15);
             const skyMat = new THREE.MeshBasicMaterial({ 
                 color: 0x87ceeb, 
@@ -1564,6 +1566,76 @@
             });
             skyObject = new THREE.Mesh(skyGeo, skyMat);
             scene.add(skyObject);
+            
+            // Create stars for night sky
+            const starGroup = new THREE.Group();
+            scene.add(starGroup);
+            
+            // Create many small stars
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 1,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: false
+            });
+            
+            // Create star field with small stars
+            const starsGeometry = new THREE.BufferGeometry();
+            const starPositions = [];
+            
+            // Create 2000 stars at random positions
+            for (let i = 0; i < 2000; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                const radius = 390 + Math.random() * 5; // Just inside the sky dome
+                
+                const x = radius * Math.sin(phi) * Math.cos(theta);
+                const y = radius * Math.sin(phi) * Math.sin(theta);
+                const z = radius * Math.cos(phi);
+                
+                starPositions.push(x, y, z);
+            }
+            
+            starsGeometry.setAttribute(
+                'position', 
+                new THREE.Float32BufferAttribute(starPositions, 3)
+            );
+            
+            const starPoints = new THREE.Points(starsGeometry, starMaterial);
+            starGroup.add(starPoints);
+            
+            // Add a few larger "planets"
+            for (let i = 0; i < 5; i++) {
+                const planetSize = 1 + Math.random() * 2;
+                const planetGeo = new THREE.SphereGeometry(planetSize, 8, 8);
+                const planetColor = new THREE.Color(
+                    0.5 + Math.random() * 0.5,
+                    0.5 + Math.random() * 0.5,
+                    0.5 + Math.random() * 0.5
+                );
+                const planetMat = new THREE.MeshBasicMaterial({
+                    color: planetColor,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const planet = new THREE.Mesh(planetGeo, planetMat);
+                
+                // Random position on dome
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                const radius = 380; // Just inside the sky dome
+                
+                planet.position.x = radius * Math.sin(phi) * Math.cos(theta);
+                planet.position.y = Math.abs(radius * Math.cos(phi)); // Keep above horizon
+                planet.position.z = radius * Math.sin(phi) * Math.sin(theta);
+                
+                starGroup.add(planet);
+            }
+            
+            // Store star group for later visibility control
+            skyObject.userData.starGroup = starGroup;
         }
         
         // Create fallback immediately to ensure something is visible
@@ -1602,26 +1674,31 @@
             else if (skyObject && skyObject.material) {
                 // Update basic sky color based on time of day
                 let skyColor;
+                let isNight = false; // Flag to control star visibility
                 
                 if (timeOfDay < 0.25) { // Night to sunrise
                     // Interpolate from dark blue to light blue/orange
                     const t = timeOfDay / 0.25;
                     skyColor = new THREE.Color(0x0a1030).lerp(new THREE.Color(0xe0c080), t);
+                    isNight = timeOfDay < 0.2; // Stars visible before dawn
                 }
                 else if (timeOfDay < 0.5) { // Sunrise to noon
                     // Interpolate from light orange to blue
                     const t = (timeOfDay - 0.25) / 0.25;
                     skyColor = new THREE.Color(0xe0c080).lerp(new THREE.Color(0x87ceeb), t);
+                    isNight = false; // No stars during day
                 }
                 else if (timeOfDay < 0.75) { // Noon to sunset
                     // Interpolate from blue to orange
                     const t = (timeOfDay - 0.5) / 0.25;
                     skyColor = new THREE.Color(0x87ceeb).lerp(new THREE.Color(0xe0c080), t);
+                    isNight = false; // No stars during day
                 }
                 else { // Sunset to night
                     // Interpolate from orange to dark blue
                     const t = (timeOfDay - 0.75) / 0.25;
                     skyColor = new THREE.Color(0xe0c080).lerp(new THREE.Color(0x0a1030), t);
+                    isNight = timeOfDay > 0.85; // Stars visible after sunset
                 }
                 
                 // Adjust for cloud cover - more clouds means whiter/grayer sky
@@ -1632,10 +1709,53 @@
                     const cloudColor = new THREE.Color(0x999999);
                     // Mix the normal sky color with the cloud color
                     skyColor.lerp(cloudColor, cloudFactor * 0.7);
+                    
+                    // Clouds obscure stars
+                    if (gameState.weather.cloudCover > 0.5) {
+                        isNight = false;
+                    }
                 }
                 
-                // Apply color to sky
-                skyObject.material.color = skyColor;
+                // Apply color to sky - make darker at night  
+                if (timeOfDay < 0.1 || timeOfDay > 0.9) {
+                    // Deep night - dark blue/black
+                    skyObject.material.color = new THREE.Color(0x000814);
+                } else {
+                    skyObject.material.color = skyColor;
+                }
+                
+                // Show/hide stars based on time of day
+                if (skyObject.userData.starGroup) {
+                    // Stars are visible at night and partially visible at dawn/dusk
+                    const starGroup = skyObject.userData.starGroup;
+                    
+                    if (isNight) {
+                        // Show stars with proper opacity based on how dark it is
+                        starGroup.visible = true;
+                        
+                        // Get a value between 0 and 1 for how deep into night we are
+                        let nightFactor = 0;
+                        if (timeOfDay < 0.1) {
+                            nightFactor = 1 - timeOfDay / 0.1; // First half of night
+                        } else if (timeOfDay > 0.9) {
+                            nightFactor = (timeOfDay - 0.9) / 0.1; // Second half of night
+                        } else if (timeOfDay < 0.2) {
+                            nightFactor = 1 - (timeOfDay - 0.1) / 0.1; // Dawn approach
+                        } else if (timeOfDay > 0.8) {
+                            nightFactor = (timeOfDay - 0.8) / 0.1; // Dusk approach
+                        }
+                        
+                        // Apply opacity to star material
+                        starGroup.children.forEach(child => {
+                            if (child.material) {
+                                child.material.opacity = Math.min(0.8, nightFactor * 0.8);
+                            }
+                        });
+                    } else {
+                        // Hide stars during day
+                        starGroup.visible = false;
+                    }
+                }
             }
         }
         updateLoadingProgress();
