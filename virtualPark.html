@@ -160,17 +160,24 @@
             pointer-events: auto;
         }
         #dialog-close {
-            background: #ffcc00;
-            color: black;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-            display: block;
-            margin: 0 auto;
+            background: #ffcc00 !important;
+            color: black !important;
+            border: none !important;
+            padding: 8px 20px !important;
+            border-radius: 20px !important;
+            cursor: pointer !important;
+            font-weight: bold !important;
+            display: block !important;
+            margin: 0 auto !important;
+            position: relative !important;
+            z-index: 800 !important;
+            pointer-events: auto !important;
+        }
+        #dialog-buttons {
             position: relative;
-            z-index: 700;
+            text-align: center;
+            margin-top: 20px;
+            z-index: 750;
             pointer-events: auto;
         }
         /* Make sure buttons always have proper click events */
@@ -243,7 +250,9 @@
     <div id="interaction-dialog">
         <div id="dialog-title">Interactive Object</div>
         <div id="dialog-content">Description of the interactive object goes here.</div>
-        <button id="dialog-close" type="button" style="z-index: 700;">Close</button>
+        <div id="dialog-buttons">
+            <button id="dialog-close" type="button" style="z-index: 700;" onclick="document.getElementById('interaction-dialog').style.display='none';">Close</button>
+        </div>
     </div>
     
     <div id="instructions">
@@ -1282,17 +1291,13 @@
                         document.getElementById('interaction-dialog').style.display = 'none';
                     };
                     
-                    // 2. Direct close button handler - hardcode with direct function
-                    const closeButton = document.getElementById('dialog-close');
-                    // Remove existing click handlers and replace with new button
-                    const newCloseButton = closeButton.cloneNode(true);
-                    closeButton.parentNode.replaceChild(newCloseButton, closeButton);
+                    // Remove any dynamically added buttons from previous dialogs
+                    const dialogButtons = document.getElementById('dialog-buttons');
+                    // Clear existing buttons except the close button
+                    const closeBtn = document.getElementById('dialog-close');
                     
-                    // Use inline handler
-                    newCloseButton.onclick = function() {
-                        document.getElementById('interaction-dialog').style.display = 'none';
-                        return false;
-                    };
+                    // Make sure the close button keeps its original HTML inline handler
+                    closeBtn.setAttribute('onclick', "document.getElementById('interaction-dialog').style.display='none';");
                     
                     // 3. Background click handler
                     dialogEl.onclick = function(e) {
