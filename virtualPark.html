@@ -159,21 +159,7 @@
             line-height: 1.5;
             pointer-events: auto;
         }
-        #dialog-close {
-            background: #ffcc00 !important;
-            color: black !important;
-            border: none !important;
-            padding: 8px 20px !important;
-            border-radius: 20px !important;
-            cursor: pointer !important;
-            font-weight: bold !important;
-            display: block !important;
-            margin: 0 auto !important;
-            position: relative !important;
-            z-index: 800 !important;
-            pointer-events: auto !important;
-        }
-        #dialog-buttons {
+                #dialog-buttons {
             position: relative;
             text-align: center;
             margin-top: 20px;
@@ -247,11 +233,11 @@
     
     <div id="interaction-prompt">Press E to interact</div>
     
-    <div id="interaction-dialog">
+    <div id="interaction-dialog" onclick="if(event.target === this) this.style.display='none';">
         <div id="dialog-title">Interactive Object</div>
         <div id="dialog-content">Description of the interactive object goes here.</div>
         <div id="dialog-buttons">
-            <!-- Close button will be created dynamically -->
+            <!-- No close button - click outside dialog to close -->
         </div>
     </div>
     
@@ -1297,17 +1283,12 @@
                         dialogButtons.removeChild(dialogButtons.firstChild);
                     };
                     
-                    // 3. Background click handler
-                    dialogEl.onclick = function(e) {
-                        if (e.target === dialogEl) {
-                            window.closeInteractionDialog();
-                        }
-                    };
+                    // Set up background click handler directly in the HTML with inline onclick
                     
-                    // 4. Escape key handler
+                    // Escape key handler - direct and simple
                     const escKeyHandler = function(e) {
                         if (e.key === 'Escape') {
-                            window.closeInteractionDialog();
+                            dialogEl.style.display = 'none';
                             document.removeEventListener('keydown', escKeyHandler);
                         }
                     };
@@ -1332,11 +1313,11 @@
                             actionBtn.style.cursor = 'pointer';
                             actionBtn.style.zIndex = '700'; // Ensure it's above other elements
                             
-                            // Global action wrapper
+                            // Global action wrapper - direct dialog closing
                             actionBtn.onclick = function(e) {
                                 e.stopPropagation(); // Prevent event bubbling
                                 if (obj.action) obj.action();
-                                window.closeInteractionDialog();
+                                dialogEl.style.display = 'none';
                             };
                             
                             contentEl.appendChild(document.createElement('br'));
@@ -1344,26 +1325,7 @@
                         });
                     }
                     
-                    // Create and add the close button to the dialog buttons container
-                    const closeButton = document.createElement('button');
-                    closeButton.textContent = "Close";
-                    closeButton.type = "button";
-                    closeButton.className = "action-btn"; // Use the same class as working buttons
-                    closeButton.style.marginRight = '10px';
-                    closeButton.style.marginBottom = '15px';
-                    closeButton.style.background = '#ffcc00';
-                    closeButton.style.color = 'black';
-                    closeButton.style.border = 'none';
-                    closeButton.style.padding = '8px 15px';
-                    closeButton.style.borderRadius = '15px';
-                    closeButton.style.cursor = 'pointer';
-                    closeButton.style.zIndex = '700';
-                    
-                    closeButton.onclick = function() {
-                        window.closeInteractionDialog();
-                    };
-                    
-                    dialogButtons.appendChild(closeButton);
+                    // No close button - we've added onClick handler to the dialog background instead
                     
                     // Show dialog
                     dialogEl.style.display = 'block';
