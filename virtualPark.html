@@ -2334,35 +2334,48 @@
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
                         console.log("CTRL+T detected - changing time of day");
-                        // Increment time by 3 hours (0.125 of a day)
-                        gameState.weather.timeOfDay = (gameState.weather.timeOfDay + 0.125) % 1;
+                        // Force direct creation of a new time of day
                         
-                        // Update sky and lighting for new time
+                        // Set time to one of fixed positions for better testing
+                        // Cycle through: midnight, dawn, morning, noon, afternoon, sunset, night
+                        const timePositions = [0.0, 0.25, 0.35, 0.5, 0.65, 0.75, 0.9];
+                        let nextTimeIndex = 0;
+                        
+                        // Find current closest time position and move to next one
+                        for (let i = 0; i < timePositions.length; i++) {
+                            if (gameState.weather.timeOfDay < timePositions[i]) {
+                                nextTimeIndex = i;
+                                break;
+                            }
+                        }
+                        
+                        // Set to next time position (or back to beginning)
+                        gameState.weather.timeOfDay = timePositions[nextTimeIndex];
+                        console.log("Setting time to:", gameState.weather.timeOfDay);
+                        
+                        // Force sky and lighting update with the new time
                         updateSkyForTimeOfDay(gameState.weather.timeOfDay);
                         updateLighting();
                         
                         // Show message about time change
                         const timeNames = {
+                            midnight: "Midnight",
                             dawn: "Dawn (Sunrise)",
                             morning: "Morning",
                             noon: "Noon",
                             afternoon: "Afternoon",
                             sunset: "Sunset",
-                            evening: "Evening",
-                            night: "Night",
-                            midnight: "Midnight"
+                            night: "Night"
                         };
                         
                         let timeName;
-                        if (gameState.weather.timeOfDay < 0.125) timeName = timeNames.midnight;
-                        else if (gameState.weather.timeOfDay < 0.25) timeName = timeNames.night;
-                        else if (gameState.weather.timeOfDay < 0.3) timeName = timeNames.dawn;
-                        else if (gameState.weather.timeOfDay < 0.4) timeName = timeNames.morning;
-                        else if (gameState.weather.timeOfDay < 0.55) timeName = timeNames.noon;
-                        else if (gameState.weather.timeOfDay < 0.7) timeName = timeNames.afternoon;
-                        else if (gameState.weather.timeOfDay < 0.8) timeName = timeNames.sunset;
-                        else if (gameState.weather.timeOfDay < 0.9) timeName = timeNames.evening;
-                        else timeName = timeNames.night;
+                        if (gameState.weather.timeOfDay === 0.0) timeName = timeNames.midnight;
+                        else if (gameState.weather.timeOfDay === 0.25) timeName = timeNames.dawn;
+                        else if (gameState.weather.timeOfDay === 0.35) timeName = timeNames.morning;
+                        else if (gameState.weather.timeOfDay === 0.5) timeName = timeNames.noon;
+                        else if (gameState.weather.timeOfDay === 0.65) timeName = timeNames.afternoon;
+                        else if (gameState.weather.timeOfDay === 0.75) timeName = timeNames.sunset;
+                        else if (gameState.weather.timeOfDay === 0.9) timeName = timeNames.night;
                         
                         showMessage("Time changed to: " + timeName);
                     }
@@ -2885,11 +2898,25 @@
             // Update interactive objects
             interactiveObjects.update(birdGroup.position);
             
-            // Update dynamic weather system
+            // Update dynamic weather system with forced refresh of sky and lighting every frame
             updateWeatherSystem();
             updateSkyForTimeOfDay(gameState.weather.timeOfDay);
             updateLighting();
             weatherEffects.update();
+            
+            // Force redraw of stars every frame for night sky effect
+            if (skyObject && skyObject.userData.starGroup) {
+                const timeOfDay = gameState.weather.timeOfDay;
+                const isNight = timeOfDay < 0.2 || timeOfDay > 0.85;
+                skyObject.userData.starGroup.visible = isNight;
+                
+                // Log once per second for debugging
+                if (Math.floor(Date.now() / 1000) % 5 === 0 && Math.floor(Date.now() / 100) % 10 === 0) {
+                    console.log("Sky update: Time =", timeOfDay.toFixed(2), 
+                                "Sky color =", skyObject.material.color.getHexString(),
+                                "Stars visible =", skyObject.userData.starGroup.visible);
+                }
+            }
             
             // Animate coins - but only if they're not already collected
             scene.traverse((object) => {
