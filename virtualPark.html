@@ -1,0 +1,2732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Park Festival - Zelda N64 Style</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace;
+        }
+        canvas { 
+            display: block; 
+        }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            font-size: 24px;
+            z-index: 100;
+            display: flex;
+            gap: 20px;
+        }
+        #coin-counter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #coin-icon {
+            color: gold;
+            font-size: 28px;
+        }
+        #weather-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #time-icon, #weather-icon {
+            font-size: 28px;
+            filter: drop-shadow(2px 2px 0 #000);
+        }
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr 1fr;
+            gap: 5px;
+            width: 180px;
+            height: 240px;
+        }
+        .control-btn {
+            background: rgba(255,255,255,0.5);
+            border: 2px solid white;
+            border-radius: 50%;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: manipulation;
+            cursor: pointer;
+        }
+        #up-btn { grid-area: 1 / 2 / 2 / 3; }
+        #left-btn { grid-area: 2 / 1 / 3 / 2; }
+        #right-btn { grid-area: 2 / 3 / 3 / 4; }
+        #down-btn { grid-area: 3 / 2 / 4 / 3; }
+        #jump-btn { 
+            grid-area: 4 / 2 / 5 / 3; 
+            background: rgba(255,220,0,0.6);
+        }
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+        }
+        #loading-bar {
+            width: 80%;
+            height: 20px;
+            border: 2px solid white;
+            margin-top: 20px;
+        }
+        #loading-progress {
+            height: 100%;
+            background: gold;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 24px;
+            text-align: center;
+            z-index: 500;
+            display: none;
+        }
+        #interaction-prompt {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            text-align: center;
+            z-index: 300;
+            display: none;
+            transition: opacity 0.3s;
+        }
+        #interaction-dialog {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #ffcc00;
+            font-size: 18px;
+            width: 80%;
+            max-width: 500px;
+            max-height: 70vh;
+            overflow-y: auto;
+            z-index: 600;
+            display: none;
+        }
+        #dialog-title {
+            font-size: 24px;
+            color: #ffcc00;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        #dialog-content {
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        #dialog-close {
+            background: #ffcc00;
+            color: black;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            display: block;
+            margin: 0 auto;
+        }
+        .interaction-indicator {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: rgba(255,204,0,0.8);
+            border-radius: 50%;
+            border: 2px solid white;
+            animation: pulse 1.5s infinite;
+            z-index: 200;
+            pointer-events: none;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 0.7; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.8); opacity: 0.7; }
+        }
+        #instructions {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
+            max-width: 300px;
+            z-index: 200;
+        }
+        @media (max-width: 768px) {
+            #instructions {
+                font-size: 14px;
+                max-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <h1>VIRTUAL PARK ADVENTURE</h1>
+        <p>Loading the magical world...</p>
+        <div id="loading-bar">
+            <div id="loading-progress"></div>
+        </div>
+    </div>
+    
+    <div id="message"></div>
+    
+    <div id="interaction-prompt">Press E to interact</div>
+    
+    <div id="interaction-dialog">
+        <div id="dialog-title">Interactive Object</div>
+        <div id="dialog-content">Description of the interactive object goes here.</div>
+        <button id="dialog-close">Close</button>
+    </div>
+    
+    <div id="instructions">
+        <h3>Controls (Zelda-style):</h3>
+        <p>Desktop: UP/W to move forward in current direction</p>
+        <p>LEFT/A and RIGHT/D to turn (not strafe)</p>
+        <p>DOWN/S to move backward</p>
+        <p>SPACE to fly higher (tap repeatedly)</p>
+        <p>E or CLICK to interact with objects</p>
+        <p>CTRL+W to change weather (for testing)</p>
+        <p>CTRL+T to change time of day (for testing)</p>
+        <p>Collect all 10 gems and explore festival attractions!</p>
+        <p>(Click/tap this box to hide)</p>
+    </div>
+    
+    <div id="ui">
+        <div id="coin-counter">
+            <span id="coin-icon">♦</span>
+            <span id="coins">0/10</span>
+        </div>
+        <div id="location">Festival Plaza</div>
+        <div id="weather-info">
+            <span id="time-icon">☀️</span>
+            <span id="weather-icon">☀️</span>
+        </div>
+    </div>
+    
+    <div id="mobile-controls">
+        <div id="up-btn" class="control-btn">⬆️</div>
+        <div id="left-btn" class="control-btn">⬅️</div>
+        <div id="right-btn" class="control-btn">➡️</div>
+        <div id="down-btn" class="control-btn">⬇️</div>
+        <div id="jump-btn" class="control-btn">↑↑</div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        
+        // Declare Sky and PositionalAudio variables
+        let Sky, PositionalAudio;
+        
+        // We'll handle missing modules with fallbacks in the sky creation section
+
+        // Detect if mobile device
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Show/hide mobile controls based on device
+        document.getElementById('mobile-controls').style.display = isMobile ? 'grid' : 'none';
+        
+        // Game state
+        const gameState = {
+            coins: 0,
+            maxCoins: 10,
+            currentZone: 'Festival Plaza',
+            playerSpeed: 0.15,
+            isJumping: false,
+            gravity: 0.01,
+            velocity: 0,
+            canInteract: false,
+            interactiveObject: null,
+            loadingProgress: 0,
+            assetsToLoad: 5, // Update this as you add more assets
+            assetsLoaded: 0,
+            isMobile: isMobile,
+            
+            // Interactive objects state
+            interactiveObjects: {
+                activationDistance: 5,
+                currentNearbyObject: null,
+                musicStage: {
+                    active: false,
+                    lastInteraction: 0
+                },
+                foodStall: {
+                    active: false,
+                    lastInteraction: 0
+                },
+                artExhibit: {
+                    active: false,
+                    visited: false
+                },
+                photoSpot: {
+                    active: false,
+                    visited: false
+                },
+                infoBooth: {
+                    active: false,
+                    visitedInfo: []
+                }
+            },
+            
+            // Dynamic weather system
+            weather: {
+                currentState: 'clear', // clear, cloudy, rainy
+                nextState: 'clear',
+                transitionProgress: 0,
+                transitionSpeed: 0.01,
+                transitionActive: false,
+                timeOfDay: 0.3, // 0 = midnight, 0.5 = noon, 1 = midnight again
+                timeSpeed: 0.0001, // speed of day/night cycle
+                rainIntensity: 0,
+                cloudCover: 0
+            },
+            particles: [] // For weather particles and effects
+        };
+        
+        // Function to show messages
+        function showMessage(text, duration = 3000) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, duration);
+        }
+        
+        // Weather system functions
+        function updateWeatherSystem() {
+            // Update time of day
+            gameState.weather.timeOfDay += gameState.weather.timeSpeed;
+            if (gameState.weather.timeOfDay >= 1) gameState.weather.timeOfDay = 0;
+            
+            // Update weather transition if active
+            if (gameState.weather.transitionActive) {
+                gameState.weather.transitionProgress += gameState.weather.transitionSpeed;
+                
+                // Transition complete
+                if (gameState.weather.transitionProgress >= 1) {
+                    gameState.weather.currentState = gameState.weather.nextState;
+                    gameState.weather.transitionActive = false;
+                    gameState.weather.transitionProgress = 0;
+                    
+                    // Show message about weather change
+                    let weatherMsg = "";
+                    switch(gameState.weather.currentState) {
+                        case "clear": weatherMsg = "The skies clear up!"; break;
+                        case "cloudy": weatherMsg = "Clouds gather overhead..."; break;
+                        case "rainy": weatherMsg = "It starts to rain!"; break;
+                    }
+                    showMessage(weatherMsg);
+                }
+                
+                // Update weather parameters during transition
+                updateWeatherParameters();
+            }
+            
+            // Randomly change weather every few minutes
+            if (!gameState.weather.transitionActive && Math.random() < 0.0005) {
+                startWeatherTransition();
+            }
+            
+            // Update UI icons
+            updateWeatherUI();
+        }
+        
+        function startWeatherTransition() {
+            const possibleStates = ["clear", "cloudy", "rainy"];
+            // Don't transition to the same state
+            let newStates = possibleStates.filter(s => s !== gameState.weather.currentState);
+            // Pick a random new state
+            gameState.weather.nextState = newStates[Math.floor(Math.random() * newStates.length)];
+            gameState.weather.transitionProgress = 0;
+            gameState.weather.transitionActive = true;
+        }
+        
+        function updateWeatherParameters() {
+            // Interpolate between current and next weather state
+            const progress = gameState.weather.transitionProgress;
+            
+            // Update cloud cover
+            let targetCloudCover = 0;
+            if (gameState.weather.nextState === "cloudy") targetCloudCover = 0.7;
+            if (gameState.weather.nextState === "rainy") targetCloudCover = 0.9;
+            
+            gameState.weather.cloudCover = gameState.weather.cloudCover * (1 - progress) + 
+                                          targetCloudCover * progress;
+            
+            // Update rain intensity
+            let targetRainIntensity = 0;
+            if (gameState.weather.nextState === "rainy") targetRainIntensity = 1.0;
+            
+            gameState.weather.rainIntensity = gameState.weather.rainIntensity * (1 - progress) + 
+                                             targetRainIntensity * progress;
+        }
+        
+        function updateWeatherUI() {
+            // Update time icon based on time of day
+            const timeIcon = document.getElementById('time-icon');
+            const timeOfDay = gameState.weather.timeOfDay;
+            
+            if (timeOfDay < 0.2) timeIcon.textContent = "🌙"; // Night
+            else if (timeOfDay < 0.3) timeIcon.textContent = "🌅"; // Sunrise
+            else if (timeOfDay < 0.7) timeIcon.textContent = "☀️"; // Day
+            else if (timeOfDay < 0.8) timeIcon.textContent = "🌇"; // Sunset
+            else timeIcon.textContent = "🌙"; // Night
+            
+            // Update weather icon based on weather state
+            const weatherIcon = document.getElementById('weather-icon');
+            
+            if (gameState.weather.rainIntensity > 0.5) {
+                weatherIcon.textContent = "🌧️"; // Rain
+            } else if (gameState.weather.cloudCover > 0.5) {
+                weatherIcon.textContent = "☁️"; // Cloudy
+            } else {
+                weatherIcon.textContent = "☀️"; // Clear
+            }
+        }
+        
+        // Instructions click handler
+        document.getElementById('instructions').addEventListener('click', function() {
+            this.style.display = 'none';
+        });
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Audio setup with fallback
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+        
+        // We'll use the built-in audio context directly instead of Three.js PositionalAudio
+        // This avoids the 404 error since PositionalAudio.js is in a different location
+        // in the Three.js library structure
+        let audioContext;
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log("Audio context created successfully");
+        } catch (error) {
+            console.warn("WebAudio not supported:", error);
+        }
+        
+        // Sound effects with better error handling
+        const sounds = {
+            coinPickup: null,
+            birdFlap: null,
+            jump: null,
+            ambient: null
+        };
+        
+        // Create audio elements
+        function initAudio() {
+            // Simple sound effect simulation (no actual files needed)
+            sounds.coinPickup = {
+                play: () => {
+                    console.log("Coin pickup sound played");
+                    // Play coin sound feedback using Web Audio API
+                    try {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        oscillator.type = "sine";
+                        oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+                        
+                        const gainNode = audioContext.createGain();
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.3);
+                    } catch (e) {
+                        console.warn("Audio API not supported:", e);
+                    }
+                }
+            };
+            
+            sounds.jump = {
+                play: () => {
+                    console.log("Jump sound played");
+                    // Play jump sound feedback using Web Audio API
+                    try {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        oscillator.type = "sine";
+                        oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4
+                        oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.2); // A5
+                        
+                        const gainNode = audioContext.createGain();
+                        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.2);
+                    } catch (e) {
+                        console.warn("Audio API not supported:", e);
+                    }
+                }
+            };
+            
+            updateLoadingProgress();
+        }
+        
+        // Initialize audio
+        initAudio();
+
+        // Simple function to update loading progress with better error handling
+        function updateLoadingProgress() {
+            try {
+                gameState.assetsLoaded++;
+                gameState.loadingProgress = (gameState.assetsLoaded / gameState.assetsToLoad) * 100;
+                const progressEl = document.getElementById('loading-progress');
+                if (progressEl) {
+                    progressEl.style.width = gameState.loadingProgress + '%';
+                }
+                
+                if (gameState.assetsLoaded >= gameState.assetsToLoad) {
+                    setTimeout(() => {
+                        const loadingScreen = document.getElementById('loading-screen');
+                        if (loadingScreen) {
+                            loadingScreen.style.display = 'none';
+                        }
+                        showMessage("Welcome to Virtual Park! Collect all 10 gems.", 5000);
+                    }, 500);
+                }
+            } catch (error) {
+                console.error("Error updating loading progress:", error);
+                // Failsafe to ensure loading screen doesn't get stuck
+                setTimeout(() => {
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.style.display = 'none';
+                    }
+                }, 5000);
+            }
+        }
+
+        // Materials library (shared for performance)
+        const materials = {
+            ground: new THREE.MeshLambertMaterial({ color: 0x44aa44 }),
+            bird: new THREE.MeshLambertMaterial({ color: 0xffdd00 }),
+            beak: new THREE.MeshLambertMaterial({ color: 0xff8800 }),
+            stage: new THREE.MeshLambertMaterial({ color: 0x999999 }),
+            neon: new THREE.MeshLambertMaterial({ 
+                color: 0x00ffff, 
+                emissive: 0x00ffff,
+                emissiveIntensity: 0.5
+            }),
+            coin: new THREE.MeshStandardMaterial({ 
+                color: 0xffdd00, 
+                metalness: 0.7,
+                roughness: 0.3,
+                emissive: 0xffaa00,
+                emissiveIntensity: 0.3
+            }),
+            tree: new THREE.MeshLambertMaterial({ color: 0x227722 }),
+            trunk: new THREE.MeshLambertMaterial({ color: 0x554422 }),
+            water: new THREE.MeshLambertMaterial({ 
+                color: 0x4466ff, 
+                transparent: true,
+                opacity: 0.7
+            }),
+            stall: new THREE.MeshLambertMaterial({ color: 0xaa7744 }),
+            roof: new THREE.MeshLambertMaterial({ color: 0xcc3333 }),
+            // Interactive object materials
+            interactiveHighlight: new THREE.MeshBasicMaterial({
+                color: 0xffcc00,
+                transparent: true,
+                opacity: 0.6,
+                side: THREE.DoubleSide
+            }),
+            musicStage: new THREE.MeshStandardMaterial({
+                color: 0x6600cc,
+                emissive: 0x440088,
+                emissiveIntensity: 0.5
+            }),
+            artInstallation: new THREE.MeshStandardMaterial({
+                color: 0x00ccff, 
+                emissive: 0x0088aa,
+                emissiveIntensity: 0.3,
+                metalness: 0.3,
+                roughness: 0.7
+            }),
+            foodMenu: new THREE.MeshLambertMaterial({
+                color: 0xff6644
+            }),
+            infoSign: new THREE.MeshLambertMaterial({
+                color: 0x22aaff
+            }),
+            photoFrame: new THREE.MeshStandardMaterial({
+                color: 0xdddddd,
+                metalness: 0.8,
+                roughness: 0.2
+            }),
+            // Weather materials
+            raindrop: new THREE.MeshBasicMaterial({
+                color: 0xaaddff,
+                transparent: true,
+                opacity: 0.6
+            }),
+            cloud: new THREE.MeshLambertMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.7
+            })
+        };
+        
+        // Weather effect objects
+        const weatherEffects = {
+            raindrops: [],
+            clouds: [],
+            
+            // Initialize weather system
+            init: function() {
+                // Create cloud group
+                this.cloudGroup = new THREE.Group();
+                this.cloudGroup.position.y = 30; // High in the sky
+                scene.add(this.cloudGroup);
+                
+                // Create 5 clouds at different positions
+                for (let i = 0; i < 5; i++) {
+                    const cloud = this.createCloud();
+                    cloud.position.set(
+                        (Math.random() - 0.5) * 100,
+                        Math.random() * 10,
+                        (Math.random() - 0.5) * 100
+                    );
+                    this.cloudGroup.add(cloud);
+                    this.clouds.push(cloud);
+                }
+                
+                // Create raindrop template (hidden initially)
+                this.rainTemplate = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.02, 0.02, 0.8, 4),
+                    materials.raindrop
+                );
+                this.rainTemplate.rotation.x = Math.PI / 2; // Make vertical
+                
+                // Create rain group
+                this.rainGroup = new THREE.Group();
+                scene.add(this.rainGroup);
+            }
+        };
+            
+        // Interactive object system
+        const interactiveObjects = {
+            objects: [],
+            indicators: [],
+            activeObject: null,
+            
+            // Create all interactive objects in the world
+            init: function() {
+                // Create Music Stage interactive elements in Festival Plaza
+                this.createMusicStageElements();
+                
+                // Create Food Stall menu in Food & Bar Village
+                this.createFoodStallMenu();
+                
+                // Create Art Installation in Cultural Grove
+                this.createArtInstallation();
+                
+                // Create Photo Spot in Outpost Ridge
+                this.createPhotoSpot();
+                
+                // Create Info Booths in various locations
+                this.createInfoBooths();
+                
+                console.log("Created interactive objects:", this.objects.length);
+            },
+            
+            // Create Music Stage interactive elements
+            createMusicStageElements: function() {
+                // Create a speaker system for the main stage
+                const speakerLeft = new THREE.Group();
+                
+                // Speaker box
+                const speakerBox = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.5, 3, 1.5),
+                    materials.musicStage
+                );
+                speakerLeft.add(speakerBox);
+                
+                // Speaker cone
+                const speakerCone = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.6, 0.4, 0.5, 16),
+                    materials.stage
+                );
+                speakerCone.position.z = 0.8;
+                speakerCone.rotation.x = Math.PI / 2;
+                speakerLeft.add(speakerCone);
+                
+                // Position by stage in Festival Plaza
+                speakerLeft.position.set(-6, 1.5, 0);
+                scene.add(speakerLeft);
+                
+                // Create right speaker (clone of left)
+                const speakerRight = speakerLeft.clone();
+                speakerRight.position.set(6, 1.5, 0);
+                scene.add(speakerRight);
+                
+                // Create interactive highlight for speakers
+                const highlightLeft = new THREE.Mesh(
+                    new THREE.SphereGeometry(2, 16, 16),
+                    materials.interactiveHighlight
+                );
+                highlightLeft.position.copy(speakerLeft.position);
+                highlightLeft.visible = false;
+                scene.add(highlightLeft);
+                
+                // Add to interactive objects with metadata
+                this.objects.push({
+                    object: speakerLeft,
+                    highlight: highlightLeft,
+                    type: 'musicStage',
+                    name: 'Festival Speakers',
+                    position: speakerLeft.position,
+                    interactionDistance: 5,
+                    content: {
+                        title: "🎵 Main Stage Sound System 🎵",
+                        description: "Get ready for an amazing lineup of artists at the festival! Today's performances include indie rock, electronic beats, and local favorites.\n\nThe main stage is equipped with state-of-the-art sound that delivers crystal clear audio throughout the festival grounds.\n\nCheck the schedule displayed on the stage for today's performances.",
+                        actions: ["Toggle Music"]
+                    },
+                    action: function() {
+                        // Toggle music would go here in a real implementation
+                        showMessage("🎵 " + (gameState.interactiveObjects.musicStage.active ? 
+                            "Music stopped" : "Music playing") + " 🎵");
+                        gameState.interactiveObjects.musicStage.active = 
+                            !gameState.interactiveObjects.musicStage.active;
+                    }
+                });
+                
+                // Create stage lighting rig
+                const lightRig = new THREE.Group();
+                
+                // Main support beam
+                const support = new THREE.Mesh(
+                    new THREE.BoxGeometry(14, 0.4, 0.4),
+                    materials.stage
+                );
+                support.position.y = 8;
+                lightRig.add(support);
+                
+                // Add stage lights
+                for (let i = -6; i <= 6; i += 3) {
+                    const light = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.4, 0.6, 0.8, 16),
+                        new THREE.MeshBasicMaterial({
+                            color: 0xffcc00,
+                            emissive: 0xffcc00,
+                            emissiveIntensity: 0.5
+                        })
+                    );
+                    light.position.set(i, -0.6, 0);
+                    light.rotation.x = Math.PI / 4;
+                    support.add(light);
+                }
+                
+                // Position above stage
+                lightRig.position.set(0, 0, 0);
+                scene.add(lightRig);
+            },
+            
+            // Create Food Stall Menu
+            createFoodStallMenu: function() {
+                // Create a menu board for a food stall
+                const menuBoard = new THREE.Group();
+                
+                // Base board
+                const board = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.5, 2, 0.1),
+                    materials.foodMenu
+                );
+                menuBoard.add(board);
+                
+                // Frame
+                const frame = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.7, 2.2, 0.05),
+                    materials.trunk
+                );
+                frame.position.z = -0.08;
+                menuBoard.add(frame);
+                
+                // Stand
+                const stand = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.1, 1, 0.1),
+                    materials.trunk
+                );
+                stand.position.y = -1.5;
+                menuBoard.add(stand);
+                
+                // Position in Food Village
+                menuBoard.position.set(30, 2, 23);
+                menuBoard.rotation.y = Math.PI / 4;
+                scene.add(menuBoard);
+                
+                // Create interactive highlight
+                const highlight = new THREE.Mesh(
+                    new THREE.SphereGeometry(1.5, 16, 16),
+                    materials.interactiveHighlight
+                );
+                highlight.position.copy(menuBoard.position);
+                highlight.visible = false;
+                scene.add(highlight);
+                
+                // Add to interactive objects
+                this.objects.push({
+                    object: menuBoard,
+                    highlight: highlight,
+                    type: 'foodStall',
+                    name: 'Food Menu',
+                    position: menuBoard.position,
+                    interactionDistance: 4,
+                    content: {
+                        title: "🍔 Festival Food Menu 🍕",
+                        description: "Explore the flavors of the festival!\n\n" +
+                            "• Wood-Fired Pizza - €8\n" +
+                            "• Gourmet Burgers - €10\n" +
+                            "• Fresh Pasta - €12\n" +
+                            "• Vegetarian Bowl - €9\n" +
+                            "• Local Craft Beer - €5\n" +
+                            "• Artisanal Gelato - €4\n\n" +
+                            "All food vendors use locally-sourced ingredients where possible. Vegetarian, vegan, and gluten-free options available at most stalls.",
+                        actions: ["View Special Offers"]
+                    },
+                    action: function() {
+                        showMessage("Today's Special: Buy any main dish and get a free drink!");
+                        gameState.interactiveObjects.foodStall.lastInteraction = Date.now();
+                    }
+                });
+            },
+            
+            // Create Art Installation in Cultural Grove
+            createArtInstallation: function() {
+                // Create an abstract art piece
+                const artPiece = new THREE.Group();
+                
+                // Base
+                const base = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1, 1.2, 0.5, 8),
+                    materials.stage
+                );
+                artPiece.add(base);
+                
+                // Create abstract sculpture with rings
+                for (let i = 0; i < 3; i++) {
+                    const ring = new THREE.Mesh(
+                        new THREE.TorusGeometry(1.5 - (i * 0.3), 0.15, 16, 32),
+                        materials.artInstallation
+                    );
+                    ring.position.y = 1.5 + (i * 0.8);
+                    ring.rotation.x = Math.PI / 2 * i;
+                    ring.rotation.z = Math.PI / 4 * i;
+                    artPiece.add(ring);
+                }
+                
+                // Add central sphere
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.7, 16, 16),
+                    new THREE.MeshStandardMaterial({
+                        color: 0xffffff,
+                        emissive: 0x8888ff,
+                        emissiveIntensity: 0.5
+                    })
+                );
+                sphere.position.y = 1.8;
+                artPiece.add(sphere);
+                
+                // Position in Cultural Grove
+                artPiece.position.set(-40, 0, -20);
+                artPiece.scale.set(1.5, 1.5, 1.5);
+                scene.add(artPiece);
+                
+                // Create interactive highlight
+                const highlight = new THREE.Mesh(
+                    new THREE.SphereGeometry(4, 16, 16),
+                    materials.interactiveHighlight
+                );
+                highlight.position.copy(artPiece.position);
+                highlight.position.y += 2;
+                highlight.visible = false;
+                scene.add(highlight);
+                
+                // Add to interactive objects
+                this.objects.push({
+                    object: artPiece,
+                    highlight: highlight,
+                    type: 'artExhibit',
+                    name: 'Art Installation',
+                    position: new THREE.Vector3(
+                        artPiece.position.x,
+                        artPiece.position.y + 2,
+                        artPiece.position.z
+                    ),
+                    interactionDistance: 6,
+                    content: {
+                        title: "🎨 'Harmony of Spheres' - Art Installation 🎨",
+                        description: "This interactive sculpture represents the interconnectedness of all festival-goers. The rings symbolize community, while the central glowing sphere represents the shared experience of music and art.\n\nThe piece was created by local artist Marina Fontana specifically for this festival.\n\nAt night, the sculpture illuminates with patterns that shift with the rhythm of the music from the main stage.",
+                        actions: ["Learn About Artist"]
+                    },
+                    action: function() {
+                        showMessage("Marina Fontana is a celebrated sculptor known for interactive light installations");
+                        gameState.interactiveObjects.artExhibit.visited = true;
+                    }
+                });
+            },
+            
+            // Create Photo Spot on Outpost Ridge
+            createPhotoSpot: function() {
+                // Create a photo frame viewpoint
+                const photoSpot = new THREE.Group();
+                
+                // Frame
+                const frame = new THREE.Mesh(
+                    new THREE.BoxGeometry(5, 3, 0.2),
+                    materials.photoFrame
+                );
+                frame.material.side = THREE.DoubleSide;
+                
+                // Instead of CSG, we'll create a frame from primitives
+                // This is simpler and avoids any CSG compatibility issues
+                
+                // Remove the original frame
+                photoSpot.remove(frame);
+                
+                // Create frame pieces manually
+                const frameThickness = 0.25;
+                const frameWidth = 5;
+                const frameHeight = 3;
+                
+                // Top bar
+                const topBar = new THREE.Mesh(
+                    new THREE.BoxGeometry(frameWidth, frameThickness, frameThickness),
+                    materials.photoFrame
+                );
+                topBar.position.y = frameHeight/2 - frameThickness/2;
+                photoSpot.add(topBar);
+                
+                // Bottom bar
+                const bottomBar = new THREE.Mesh(
+                    new THREE.BoxGeometry(frameWidth, frameThickness, frameThickness),
+                    materials.photoFrame
+                );
+                bottomBar.position.y = -frameHeight/2 + frameThickness/2;
+                photoSpot.add(bottomBar);
+                
+                // Left bar
+                const leftBar = new THREE.Mesh(
+                    new THREE.BoxGeometry(frameThickness, frameHeight, frameThickness),
+                    materials.photoFrame
+                );
+                leftBar.position.x = -frameWidth/2 + frameThickness/2;
+                photoSpot.add(leftBar);
+                
+                // Right bar
+                const rightBar = new THREE.Mesh(
+                    new THREE.BoxGeometry(frameThickness, frameHeight, frameThickness),
+                    materials.photoFrame
+                );
+                rightBar.position.x = frameWidth/2 - frameThickness/2;
+                photoSpot.add(rightBar);
+                
+                // Support legs
+                const leftLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 2, 0.2),
+                    materials.photoFrame
+                );
+                leftLeg.position.set(-2.2, -2.5, 0);
+                photoSpot.add(leftLeg);
+                
+                const rightLeg = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 2, 0.2),
+                    materials.photoFrame
+                );
+                rightLeg.position.set(2.2, -2.5, 0);
+                photoSpot.add(rightLeg);
+                
+                // Position on Outpost Ridge
+                photoSpot.position.set(10, 7, -45);
+                // Face toward good view
+                photoSpot.rotation.y = -Math.PI / 2;
+                scene.add(photoSpot);
+                
+                // Create interactive highlight
+                const highlight = new THREE.Mesh(
+                    new THREE.SphereGeometry(3, 16, 16),
+                    materials.interactiveHighlight
+                );
+                highlight.position.copy(photoSpot.position);
+                highlight.visible = false;
+                scene.add(highlight);
+                
+                // Add to interactive objects
+                this.objects.push({
+                    object: photoSpot,
+                    highlight: highlight,
+                    type: 'photoSpot',
+                    name: 'Photo Frame',
+                    position: photoSpot.position,
+                    interactionDistance: 5,
+                    content: {
+                        title: "📸 Festival Viewpoint 📸",
+                        description: "You've discovered one of the best photo spots in the park! From here, you can see the entire festival layout.\n\nPosition yourself behind the frame to capture a perfect festival memory to share on social media.\n\nDon't forget to use the festival hashtag #VirtualParkFest when posting your photos!",
+                        actions: ["Take Photo"]
+                    },
+                    action: function() {
+                        showMessage("📸 Smile! Picture taken from this amazing viewpoint!");
+                        gameState.interactiveObjects.photoSpot.visited = true;
+                    }
+                });
+            },
+            
+            // Create Info Booths around the park
+            createInfoBooths: function() {
+                // Info booth locations and topics
+                const boothLocations = [
+                    // Festival Plaza - general info
+                    {
+                        position: new THREE.Vector3(10, 0, 10),
+                        rotation: Math.PI / 4,
+                        topic: "general",
+                        title: "ℹ️ Festival Information ℹ️",
+                        description: "Welcome to the Summer Festival!\n\n" +
+                            "• Festival Hours: 11:00 - 23:00\n" +
+                            "• First Aid: Located next to the main entrance\n" +
+                            "• Lost & Found: At the information desk\n" +
+                            "• Water Stations: Available throughout the grounds\n\n" +
+                            "Download the festival app for real-time updates and artist information!",
+                    },
+                    // Food Village - sustainability info
+                    {
+                        position: new THREE.Vector3(35, 0, 30),
+                        rotation: -Math.PI / 6,
+                        topic: "sustainability",
+                        title: "♻️ Sustainability Initiatives ♻️",
+                        description: "Our festival is committed to minimizing environmental impact:\n\n" +
+                            "• All food containers are compostable\n" +
+                            "• Water refill stations to reduce plastic waste\n" +
+                            "• Solar-powered charging stations\n" +
+                            "• Bike valet service to encourage green transportation\n\n" +
+                            "Look for the green recycling bins throughout the grounds!",
+                    },
+                    // Cultural Grove - cultural program
+                    {
+                        position: new THREE.Vector3(-30, 0, -20),
+                        rotation: Math.PI / 2,
+                        topic: "cultural",
+                        title: "🎭 Cultural Program 🎭",
+                        description: "Explore the cultural side of the festival:\n\n" +
+                            "• Art Installations: Throughout the Cultural Grove\n" +
+                            "• Interactive Workshops: Scheduled hourly at the Workshop Tent\n" +
+                            "• Local Artisans: Showcasing traditional crafts\n" +
+                            "• Poetry Corner: Open mic poetry readings at sunset\n\n" +
+                            "Check the cultural program board for today's schedule!",
+                    }
+                ];
+                
+                // Create each info booth
+                boothLocations.forEach(booth => {
+                    const infoStand = new THREE.Group();
+                    
+                    // Stand base
+                    const base = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.5, 0.1, 1.5),
+                        materials.stage
+                    );
+                    infoStand.add(base);
+                    
+                    // Info panel
+                    const panel = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.4, 2, 0.1),
+                        materials.infoSign
+                    );
+                    panel.position.set(0, 1.1, 0);
+                    infoStand.add(panel);
+                    
+                    // Support pole
+                    const pole = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.1, 0.1, 2, 8),
+                        materials.stage
+                    );
+                    pole.position.set(0, 1, 0);
+                    infoStand.add(pole);
+                    
+                    // Position in the world
+                    infoStand.position.copy(booth.position);
+                    infoStand.rotation.y = booth.rotation;
+                    scene.add(infoStand);
+                    
+                    // Create interactive highlight
+                    const highlight = new THREE.Mesh(
+                        new THREE.SphereGeometry(2, 16, 16),
+                        materials.interactiveHighlight
+                    );
+                    highlight.position.copy(infoStand.position);
+                    highlight.position.y += 1;
+                    highlight.visible = false;
+                    scene.add(highlight);
+                    
+                    // Add to interactive objects
+                    this.objects.push({
+                        object: infoStand,
+                        highlight: highlight,
+                        type: 'infoBooth',
+                        name: 'Info Booth: ' + booth.topic,
+                        position: new THREE.Vector3(
+                            infoStand.position.x,
+                            infoStand.position.y + 1,
+                            infoStand.position.z
+                        ),
+                        interactionDistance: 4,
+                        content: {
+                            title: booth.title,
+                            description: booth.description,
+                            actions: ["Thank You"]
+                        },
+                        action: function() {
+                            showMessage("Enjoy the festival! Let us know if you have any questions.");
+                            
+                            // Mark this info as visited
+                            if (!gameState.interactiveObjects.infoBooth.visitedInfo.includes(booth.topic)) {
+                                gameState.interactiveObjects.infoBooth.visitedInfo.push(booth.topic);
+                                
+                                // If player has visited all info booths, give them a reward
+                                if (gameState.interactiveObjects.infoBooth.visitedInfo.length >= 3) {
+                                    setTimeout(() => {
+                                        showMessage("You've visited all info booths! You're a well-informed festival-goer!");
+                                    }, 3000);
+                                }
+                            }
+                        }
+                    });
+                });
+            },
+            
+            // Update all interactive objects (check for proximity, etc.)
+            update: function(playerPosition) {
+                let closestObject = null;
+                let closestDistance = Infinity;
+                let isNearObject = false;
+                
+                // Check all objects for proximity to player
+                this.objects.forEach(obj => {
+                    // Calculate world position if needed
+                    const objPosition = obj.position;
+                    
+                    // Calculate distance to player
+                    const distance = objPosition.distanceTo(playerPosition);
+                    
+                    // If within interaction distance
+                    if (distance < obj.interactionDistance) {
+                        isNearObject = true;
+                        
+                        // Track closest object
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestObject = obj;
+                            
+                            // Show highlight for closest object
+                            if (obj.highlight) {
+                                obj.highlight.visible = true;
+                                
+                                // Pulse effect
+                                const scale = 1 + 0.2 * Math.sin(Date.now() * 0.003);
+                                obj.highlight.scale.set(scale, scale, scale);
+                            }
+                        }
+                    } else {
+                        // Hide highlight when out of range
+                        if (obj.highlight) {
+                            obj.highlight.visible = false;
+                        }
+                    }
+                });
+                
+                // Update UI for interaction
+                const promptEl = document.getElementById('interaction-prompt');
+                if (closestObject && isNearObject) {
+                    // Show interaction prompt
+                    promptEl.textContent = gameState.isMobile ? 
+                        "Tap to interact with " + closestObject.name :
+                        "Press E to interact with " + closestObject.name;
+                    promptEl.style.display = 'block';
+                    
+                    // Update game state
+                    gameState.interactiveObjects.currentNearbyObject = closestObject;
+                    gameState.canInteract = true;
+                } else {
+                    // Hide prompt when no objects nearby
+                    promptEl.style.display = 'none';
+                    gameState.interactiveObjects.currentNearbyObject = null;
+                    gameState.canInteract = false;
+                }
+                
+                // Set active object
+                this.activeObject = closestObject;
+                
+                return isNearObject;
+            },
+            
+            // Handle interaction with current object
+            interact: function() {
+                if (this.activeObject) {
+                    const obj = this.activeObject;
+                    
+                    // Show dialog with object information
+                    const dialogEl = document.getElementById('interaction-dialog');
+                    const titleEl = document.getElementById('dialog-title');
+                    const contentEl = document.getElementById('dialog-content');
+                    
+                    // Set dialog content
+                    titleEl.textContent = obj.content.title;
+                    
+                    // Format description with line breaks
+                    contentEl.innerHTML = obj.content.description.replace(/\n/g, '<br>');
+                    
+                    // Add action buttons if any
+                    if (obj.content.actions && obj.content.actions.length > 0) {
+                        // Add action buttons
+                        obj.content.actions.forEach(action => {
+                            const actionBtn = document.createElement('button');
+                            actionBtn.textContent = action;
+                            actionBtn.className = 'action-btn';
+                            actionBtn.style.marginRight = '10px';
+                            actionBtn.style.marginBottom = '15px';
+                            actionBtn.style.background = '#ffcc00';
+                            actionBtn.style.color = 'black';
+                            actionBtn.style.border = 'none';
+                            actionBtn.style.padding = '8px 15px';
+                            actionBtn.style.borderRadius = '15px';
+                            actionBtn.style.cursor = 'pointer';
+                            actionBtn.onclick = () => {
+                                if (obj.action) obj.action();
+                                dialogEl.style.display = 'none';
+                            };
+                            contentEl.appendChild(document.createElement('br'));
+                            contentEl.appendChild(actionBtn);
+                        });
+                    }
+                    
+                    // Show dialog
+                    dialogEl.style.display = 'block';
+                    
+                    // Setup close button
+                    document.getElementById('dialog-close').onclick = () => {
+                        dialogEl.style.display = 'none';
+                    };
+                    
+                    return true;
+                }
+                return false;
+            }
+        };
+        
+        // Add the createCloud function to weatherEffects
+        weatherEffects.createCloud = function() {
+            const cloud = new THREE.Group();
+            
+            // Add several overlapping spheres for fluffy appearance
+            const positions = [
+                [0, 0, 0],
+                [1, 0.2, 0],
+                [-1, 0.3, 0],
+                [0.5, 0.4, 0.5],
+                [-0.5, 0.1, -0.5],
+                [0, 0.3, -1]
+            ];
+            
+            for (const pos of positions) {
+                const size = 1.5 + Math.random() * 2;
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(size, 7, 7),
+                    materials.cloud
+                );
+                sphere.position.set(pos[0] * 2, pos[1], pos[2] * 2);
+                cloud.add(sphere);
+            }
+            
+            // Set cloud to be invisible initially
+            cloud.visible = false;
+            return cloud;
+        };
+        
+        // Add the update function to weatherEffects
+        weatherEffects.update = function() {
+            // Update cloud visibility and opacity based on cloud cover
+            const cloudCover = gameState.weather.cloudCover;
+            for (let i = 0; i < this.clouds.length; i++) {
+                const cloud = this.clouds[i];
+                
+                // Make clouds visible when there's cloud cover
+                cloud.visible = cloudCover > 0.1;
+                
+                // Move clouds slowly
+                cloud.position.x += 0.05;
+                if (cloud.position.x > 100) cloud.position.x = -100;
+                
+                // Set cloud opacity
+                cloud.children.forEach(part => {
+                    part.material.opacity = 0.4 + (cloudCover * 0.6);
+                });
+            }
+            
+            // Update rain
+            const rainIntensity = gameState.weather.rainIntensity;
+            
+            // Add new raindrops based on intensity
+            if (rainIntensity > 0.3 && Math.random() < rainIntensity * 0.3) {
+                this.createRaindrop();
+            }
+            
+            // Update existing raindrops
+            for (let i = this.raindrops.length - 1; i >= 0; i--) {
+                const drop = this.raindrops[i];
+                
+                // Move raindrop down
+                drop.position.y -= 0.7;
+                
+                // Remove drops that hit the ground
+                if (drop.position.y < 1) {
+                    this.rainGroup.remove(drop);
+                    this.raindrops.splice(i, 1);
+                }
+            }
+        };
+            
+        // Add the createRaindrop function to weatherEffects
+        weatherEffects.createRaindrop = function() {
+            // Create a raindrop near the player
+            const drop = this.rainTemplate.clone();
+            
+            // Position raindrop above player with some random offset
+            drop.position.set(
+                birdGroup.position.x + (Math.random() - 0.5) * 40,
+                30, // High in the sky
+                birdGroup.position.z + (Math.random() - 0.5) * 40
+            );
+            
+            // Add to scene and tracking array
+            this.rainGroup.add(drop);
+            this.raindrops.push(drop);
+        };
+
+        // Helper function for creating a blocky tree
+        function createTree(height = 6, trunkHeight = 2, size = 3) {
+            const tree = new THREE.Group();
+            
+            // Trunk (brown box)
+            const trunkGeo = new THREE.BoxGeometry(size * 0.3, trunkHeight, size * 0.3);
+            const trunk = new THREE.Mesh(trunkGeo, materials.trunk);
+            trunk.position.y = trunkHeight / 2;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            tree.add(trunk);
+            
+            // Foliage (green pyramid)
+            const foliageGeo = new THREE.ConeGeometry(size, height - trunkHeight, 4);
+            const foliage = new THREE.Mesh(foliageGeo, materials.tree);
+            foliage.position.y = trunkHeight + (height - trunkHeight) / 2;
+            foliage.castShadow = true;
+            tree.add(foliage);
+            
+            return tree;
+        }
+
+        // Helper function for creating a food stall
+        function createStall(width = 4, depth = 3, height = 3) {
+            const stall = new THREE.Group();
+            
+            // Base
+            const baseGeo = new THREE.BoxGeometry(width, height * 0.8, depth);
+            const base = new THREE.Mesh(baseGeo, materials.stall);
+            base.position.y = height * 0.4;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            stall.add(base);
+            
+            // Roof (pitched)
+            const roofGeo = new THREE.ConeGeometry(width * 0.75, height * 0.5, 4);
+            const roof = new THREE.Mesh(roofGeo, materials.roof);
+            roof.position.y = height * 0.8 + height * 0.25;
+            roof.rotation.y = Math.PI / 4;
+            roof.castShadow = true;
+            stall.add(roof);
+            
+            // Counter
+            const counterGeo = new THREE.BoxGeometry(width * 0.8, height * 0.1, depth * 0.3);
+            const counter = new THREE.Mesh(counterGeo, materials.stage);
+            counter.position.set(0, height * 0.45, depth * 0.35 + depth * 0.15);
+            counter.castShadow = true;
+            stall.add(counter);
+            
+            return stall;
+        }
+
+        // Create a coin with the classic Rupee shape
+        function createCoin() {
+            // Use a larger, more visible gem shape
+            const coinGeo = new THREE.OctahedronGeometry(1.0, 0); // Doubled size for better visibility
+            const coin = new THREE.Mesh(coinGeo, materials.coin);
+            
+            // Add a glow effect
+            const glowGeo = new THREE.OctahedronGeometry(1.3, 0);
+            const glowMat = new THREE.MeshBasicMaterial({ 
+                color: 0xffff00, 
+                transparent: true, 
+                opacity: 0.3,
+                side: THREE.BackSide
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            coin.add(glow);
+            
+            // Setup coin properties
+            coin.castShadow = true;
+            coin.userData.isCoin = true;
+            coin.userData.collected = false;
+            
+            // Store the original height when placed in the world
+            // This will be set when the coin is positioned in the createWorld function
+            coin.userData.baseHeight = 1;
+            
+            return coin;
+        }
+
+        // Ground (Festival Plaza grass)
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const ground = new THREE.Mesh(groundGeo, materials.ground);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        updateLoadingProgress();
+
+        // Add sky to scene
+        let skyObject, skyUniforms, skyAdvanced = false;
+        let sunPosition = new THREE.Vector3(0, 1, 0);
+        
+        // Try to load Sky module dynamically
+        try {
+            // Dynamically import the Sky module
+            import('three/addons/objects/Sky.js').then(module => {
+                Sky = module.Sky;
+                
+                // Create advanced sky if module loaded
+                if (Sky) {
+                    const sky = new Sky();
+                    sky.scale.setScalar(450);
+                    scene.add(sky);
+                    skyObject = sky;
+                    skyAdvanced = true;
+                    
+                    // Initialize sun position
+                    sunPosition = new THREE.Vector3();
+                    skyUniforms = sky.material.uniforms;
+                    skyUniforms['turbidity'].value = 10;
+                    skyUniforms['rayleigh'].value = 2;
+                    skyUniforms['mieCoefficient'].value = 0.005;
+                    skyUniforms['mieDirectionalG'].value = 0.8;
+                    
+                    // Initial sun position (will be updated by weather system)
+                    updateSkyForTimeOfDay(gameState.weather.timeOfDay);
+                    
+                    console.log("Advanced sky created successfully");
+                }
+            }).catch(error => {
+                console.warn("Could not load Sky module:", error);
+                createFallbackSky();
+            });
+        } catch (error) {
+            console.warn("Error setting up sky:", error);
+            createFallbackSky();
+        }
+        
+        // Create a simple skybox as fallback
+        function createFallbackSky() {
+            console.log("Creating fallback sky");
+            const skyGeo = new THREE.SphereGeometry(400, 32, 15);
+            const skyMat = new THREE.MeshBasicMaterial({ 
+                color: 0x87ceeb, 
+                side: THREE.BackSide 
+            });
+            skyObject = new THREE.Mesh(skyGeo, skyMat);
+            scene.add(skyObject);
+        }
+        
+        // Create fallback immediately to ensure something is visible
+        createFallbackSky();
+        
+        // Update sky based on time of day and weather
+        function updateSkyForTimeOfDay(timeOfDay) {
+            if (skyAdvanced && skyUniforms) {
+                // Calculate sun position based on time of day
+                // Time of day: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1 = midnight
+                
+                // Elevation angle changes with time of day
+                // At noon (0.5), sun is at highest point 90 degrees
+                // At midnight (0 or 1), sun is at lowest point -90 degrees
+                let elevation = (timeOfDay * 2) * 180 - 90; // Convert to -90 to 90 range
+                if (elevation > 90) elevation = 180 - elevation; // Fall back down after noon
+                
+                // Only show sun when it's above horizon
+                if (elevation < 0) elevation = 0;
+                
+                // Convert to radians for THREE.js
+                const phi = THREE.MathUtils.degToRad(90 - elevation);
+                
+                // Azimuth (horizontal angle) progresses 0 to 360 throughout the day
+                const theta = THREE.MathUtils.degToRad(timeOfDay * 360);
+                
+                // Update sun position
+                sunPosition.setFromSphericalCoords(1, phi, theta);
+                skyUniforms['sunPosition'].value.copy(sunPosition);
+                
+                // Change turbidity and rayleigh based on weather
+                // Cloudier weather means hazier sky
+                skyUniforms['turbidity'].value = 10 - (gameState.weather.cloudCover * 4);
+                skyUniforms['rayleigh'].value = 2 + (gameState.weather.cloudCover * 1);
+            }
+            else if (skyObject && skyObject.material) {
+                // Update basic sky color based on time of day
+                let skyColor;
+                
+                if (timeOfDay < 0.25) { // Night to sunrise
+                    // Interpolate from dark blue to light blue/orange
+                    const t = timeOfDay / 0.25;
+                    skyColor = new THREE.Color(0x0a1030).lerp(new THREE.Color(0xe0c080), t);
+                }
+                else if (timeOfDay < 0.5) { // Sunrise to noon
+                    // Interpolate from light orange to blue
+                    const t = (timeOfDay - 0.25) / 0.25;
+                    skyColor = new THREE.Color(0xe0c080).lerp(new THREE.Color(0x87ceeb), t);
+                }
+                else if (timeOfDay < 0.75) { // Noon to sunset
+                    // Interpolate from blue to orange
+                    const t = (timeOfDay - 0.5) / 0.25;
+                    skyColor = new THREE.Color(0x87ceeb).lerp(new THREE.Color(0xe0c080), t);
+                }
+                else { // Sunset to night
+                    // Interpolate from orange to dark blue
+                    const t = (timeOfDay - 0.75) / 0.25;
+                    skyColor = new THREE.Color(0xe0c080).lerp(new THREE.Color(0x0a1030), t);
+                }
+                
+                // Adjust for cloud cover - more clouds means whiter/grayer sky
+                if (gameState.weather.cloudCover > 0) {
+                    // Get a value between 0 and 1 based on cloud cover
+                    const cloudFactor = gameState.weather.cloudCover;
+                    // Create a gray color
+                    const cloudColor = new THREE.Color(0x999999);
+                    // Mix the normal sky color with the cloud color
+                    skyColor.lerp(cloudColor, cloudFactor * 0.7);
+                }
+                
+                // Apply color to sky
+                skyObject.material.color = skyColor;
+            }
+        }
+        updateLoadingProgress();
+
+        // Dynamic lighting based on time and weather
+        const ambientLight = new THREE.AmbientLight(0xccccff, 0.4);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffcc, 0.8);
+        directionalLight.position.set(50, 100, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 1024;
+        directionalLight.shadow.mapSize.height = 1024;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 200;
+        directionalLight.shadow.camera.left = -100;
+        directionalLight.shadow.camera.right = 100;
+        directionalLight.shadow.camera.top = 100;
+        directionalLight.shadow.camera.bottom = -100;
+        scene.add(directionalLight);
+        
+        // Update lighting based on time of day and weather
+        function updateLighting() {
+            const timeOfDay = gameState.weather.timeOfDay;
+            const cloudCover = gameState.weather.cloudCover;
+            
+            // Calculate base intensity based on time of day
+            // Brightest at noon, darkest at midnight
+            let lightIntensity = 0;
+            
+            if (timeOfDay < 0.25) { // Night to sunrise
+                // Gradually increase from 0.1 to 0.5
+                lightIntensity = 0.1 + (timeOfDay / 0.25) * 0.4;
+            }
+            else if (timeOfDay < 0.5) { // Sunrise to noon
+                // Gradually increase from 0.5 to 1.0
+                lightIntensity = 0.5 + ((timeOfDay - 0.25) / 0.25) * 0.5;
+            }
+            else if (timeOfDay < 0.75) { // Noon to sunset
+                // Gradually decrease from 1.0 to 0.5
+                lightIntensity = 1.0 - ((timeOfDay - 0.5) / 0.25) * 0.5;
+            }
+            else { // Sunset to night
+                // Gradually decrease from 0.5 to 0.1
+                lightIntensity = 0.5 - ((timeOfDay - 0.75) / 0.25) * 0.4;
+            }
+            
+            // Reduce intensity based on cloud cover
+            const finalIntensity = lightIntensity * (1 - (cloudCover * 0.4));
+            
+            // Update directional light (sun/moon)
+            directionalLight.intensity = finalIntensity * 0.8;
+            
+            // Update ambient light (overall scene brightness)
+            // Higher during day, lower at night
+            ambientLight.intensity = finalIntensity * 0.4;
+            
+            // Change light color based on time of day
+            if (timeOfDay < 0.25 || timeOfDay >= 0.75) {
+                // Night - cooler light
+                directionalLight.color.set(0xaabbff);
+                ambientLight.color.set(0x334455);
+            } else {
+                // Day - warmer light
+                directionalLight.color.set(0xffffcc);
+                ambientLight.color.set(0xccccff);
+            }
+            
+            // Update directional light position based on sun position
+            if (sunPosition) {
+                directionalLight.position.set(
+                    sunPosition.x * 100,
+                    Math.max(sunPosition.y, 0.1) * 100, // Keep light above horizon
+                    sunPosition.z * 100
+                );
+            }
+        }
+        updateLoadingProgress();
+
+        // Bird Avatar (player character)
+        const birdGroup = new THREE.Group();
+        
+        // Bird body (low-poly, blocky style)
+        const birdGeo = new THREE.BoxGeometry(1, 0.5, 1.5);
+        const bird = new THREE.Mesh(birdGeo, materials.bird);
+        bird.castShadow = true;
+        birdGroup.add(bird);
+        
+        // Wings (simplistic rectangular flaps)
+        const wingGeo = new THREE.BoxGeometry(1.5, 0.1, 0.8);
+        const leftWing = new THREE.Mesh(wingGeo, materials.bird);
+        leftWing.position.set(-0.8, 0, 0);
+        birdGroup.add(leftWing);
+        
+        const rightWing = new THREE.Mesh(wingGeo, materials.bird);
+        rightWing.position.set(0.8, 0, 0);
+        birdGroup.add(rightWing);
+        
+        // Beak
+        const beakGeo = new THREE.ConeGeometry(0.2, 0.5, 4);
+        const beak = new THREE.Mesh(beakGeo, materials.beak);
+        beak.position.set(0, 0, 0.8);
+        beak.rotation.x = Math.PI / 2;
+        birdGroup.add(beak);
+        
+        // Eyes
+        const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMaterial);
+        leftEye.position.set(-0.3, 0.1, 0.6);
+        birdGroup.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMaterial);
+        rightEye.position.set(0.3, 0.1, 0.6);
+        birdGroup.add(rightEye);
+        
+        birdGroup.position.set(0, 2, 0); // Start 2 units above ground
+        scene.add(birdGroup);
+        updateLoadingProgress();
+
+        // Navigation System
+        const raycaster = new THREE.Raycaster();
+        const moveDirection = new THREE.Vector3(0, 0, 0);
+        let isMoving = false;
+        
+        // Collision detection helpers
+        const worldObjects = [];
+        const birdBoundingBox = new THREE.Box3().setFromObject(birdGroup);
+        
+        // Create world zones
+        function createWorld() {
+            // FESTIVAL PLAZA ZONE
+            const plazaZone = new THREE.Group();
+            plazaZone.name = "Festival Plaza";
+            
+            // Stage (blocky, neon-trimmed)
+            const stageGeo = new THREE.BoxGeometry(12, 1, 8);
+            const stage = new THREE.Mesh(stageGeo, materials.stage);
+            stage.position.set(0, 0.5, 0);
+            stage.receiveShadow = true;
+            stage.castShadow = true;
+            plazaZone.add(stage);
+            
+            // Neon trim on stage
+            const neonGeo = new THREE.BoxGeometry(12.2, 0.2, 8.2);
+            const neon = new THREE.Mesh(neonGeo, materials.neon);
+            neon.position.set(0, 1.1, 0);
+            plazaZone.add(neon);
+            
+            // Add coins around the plaza
+            const plazaCoin1 = createCoin();
+            plazaCoin1.position.set(5, 1, 5);
+            plazaCoin1.userData.baseHeight = 1; // Store the base height
+            plazaZone.add(plazaCoin1);
+            
+            const plazaCoin2 = createCoin();
+            plazaCoin2.position.set(-5, 1, -5);
+            plazaCoin2.userData.baseHeight = 1; // Store the base height
+            plazaZone.add(plazaCoin2);
+            
+            // Add some trees around the plaza
+            for (let i = 0; i < 6; i++) {
+                const tree = createTree(5 + Math.random() * 3);
+                const angle = (i / 6) * Math.PI * 2;
+                const distance = 15 + Math.random() * 5;
+                tree.position.set(
+                    Math.cos(angle) * distance,
+                    0,
+                    Math.sin(angle) * distance
+                );
+                plazaZone.add(tree);
+                
+                // Add to collision objects
+                const treeBox = new THREE.Box3().setFromObject(tree);
+                tree.userData.boundingBox = treeBox;
+                worldObjects.push(tree);
+            }
+            
+            scene.add(plazaZone);
+            
+            // FOOD & BAR VILLAGE ZONE
+            const foodZone = new THREE.Group();
+            foodZone.name = "Food & Bar Village";
+            foodZone.position.set(30, 0, 20);
+            
+            // Create a circular arrangement of food stalls
+            for (let i = 0; i < 8; i++) {
+                const stall = createStall(4, 3, 3);
+                const angle = (i / 8) * Math.PI * 2;
+                const distance = 8;
+                stall.position.set(
+                    Math.cos(angle) * distance,
+                    0,
+                    Math.sin(angle) * distance
+                );
+                stall.rotation.y = angle + Math.PI; // Face outward
+                foodZone.add(stall);
+                
+                // Add to collision objects
+                const stallBox = new THREE.Box3().setFromObject(stall);
+                stall.userData.boundingBox = stallBox;
+                worldObjects.push(stall);
+            }
+            
+            // Add coins on some of the stalls
+            const foodCoin1 = createCoin();
+            foodCoin1.position.set(0, 4, 8);
+            foodCoin1.userData.baseHeight = 4; // Store the base height
+            foodZone.add(foodCoin1);
+            
+            const foodCoin2 = createCoin();
+            foodCoin2.position.set(8, 4, 0);
+            foodCoin2.userData.baseHeight = 4; // Store the base height
+            foodZone.add(foodCoin2);
+            
+            // Add central bar counter
+            const barGeo = new THREE.CylinderGeometry(3, 3, 1, 8);
+            const bar = new THREE.Mesh(barGeo, materials.stage);
+            bar.position.set(0, 0.5, 0);
+            bar.receiveShadow = true;
+            bar.castShadow = true;
+            foodZone.add(bar);
+            
+            // Neon trim on bar
+            const barNeonGeo = new THREE.TorusGeometry(3, 0.2, 8, 16);
+            const barNeon = new THREE.Mesh(barNeonGeo, materials.neon);
+            barNeon.position.set(0, 1, 0);
+            barNeon.rotation.x = Math.PI / 2;
+            foodZone.add(barNeon);
+            
+            scene.add(foodZone);
+            
+            // CULTURAL GROVE ZONE
+            const groveZone = new THREE.Group();
+            groveZone.name = "Cultural Grove";
+            groveZone.position.set(-40, 0, -30);
+            
+            // Dense tree population with maze-like paths
+            for (let i = 0; i < 30; i++) {
+                const tree = createTree(6 + Math.random() * 4, 2, 4);
+                // Create a grid-like pattern with some randomness
+                const x = (Math.floor(i / 5) * 8) - 20 + (Math.random() * 4 - 2);
+                const z = ((i % 5) * 8) - 20 + (Math.random() * 4 - 2);
+                tree.position.set(x, 0, z);
+                groveZone.add(tree);
+                
+                // Add to collision objects
+                const treeBox = new THREE.Box3().setFromObject(tree);
+                tree.userData.boundingBox = treeBox;
+                worldObjects.push(tree);
+            }
+            
+            // Add coins in hidden spots
+            for (let i = 0; i < 3; i++) {
+                const groveCoin = createCoin();
+                const coinHeight = 1;
+                groveCoin.position.set(
+                    -15 + Math.random() * 30,
+                    coinHeight,
+                    -15 + Math.random() * 30
+                );
+                groveCoin.userData.baseHeight = coinHeight;
+                groveZone.add(groveCoin);
+            }
+            
+            // Tribal totems (neon-painted stones)
+            for (let i = 0; i < 3; i++) {
+                const totemGeo = new THREE.CylinderGeometry(1, 1, 4, 8);
+                const totem = new THREE.Mesh(totemGeo, materials.stage);
+                
+                // Position totems in a triangular formation
+                const angle = (i / 3) * Math.PI * 2;
+                totem.position.set(
+                    Math.cos(angle) * 10,
+                    2,
+                    Math.sin(angle) * 10
+                );
+                totem.castShadow = true;
+                groveZone.add(totem);
+                
+                // Neon markings on totem
+                const markingGeo = new THREE.TorusGeometry(1.1, 0.2, 8, 8);
+                const marking = new THREE.Mesh(markingGeo, materials.neon);
+                marking.position.y = 1;
+                marking.rotation.x = Math.PI / 2;
+                totem.add(marking);
+                
+                // Add to collision objects
+                const totemBox = new THREE.Box3().setFromObject(totem);
+                totem.userData.boundingBox = totemBox;
+                worldObjects.push(totem);
+            }
+            
+            scene.add(groveZone);
+            
+            // OUTPOST RIDGE ZONE
+            const ridgeZone = new THREE.Group();
+            ridgeZone.name = "Outpost Ridge";
+            ridgeZone.position.set(10, 5, -50);
+            
+            // Create raised platform
+            const ridgeGeo = new THREE.BoxGeometry(40, 10, 20);
+            const ridge = new THREE.Mesh(ridgeGeo, materials.ground);
+            ridge.position.set(0, -5, 0);
+            ridge.receiveShadow = true;
+            ridgeZone.add(ridge);
+            
+            // Watchtower
+            const towerBaseGeo = new THREE.BoxGeometry(6, 12, 6);
+            const towerBase = new THREE.Mesh(towerBaseGeo, materials.trunk);
+            towerBase.position.set(0, 6, 0);
+            towerBase.castShadow = true;
+            ridgeZone.add(towerBase);
+            
+            const towerTopGeo = new THREE.BoxGeometry(8, 3, 8);
+            const towerTop = new THREE.Mesh(towerTopGeo, materials.stage);
+            towerTop.position.set(0, 13.5, 0);
+            towerTop.castShadow = true;
+            ridgeZone.add(towerTop);
+            
+            // Neon trim on tower top
+            const towerNeonGeo = new THREE.BoxGeometry(8.2, 0.2, 8.2);
+            const towerNeon = new THREE.Mesh(towerNeonGeo, materials.neon);
+            towerNeon.position.set(0, 15, 0);
+            ridgeZone.add(towerNeon);
+            
+            // Stairs leading up to the ridge
+            const stairsGeo = new THREE.BoxGeometry(10, 1, 30);
+            const stairs = new THREE.Mesh(stairsGeo, materials.stage);
+            stairs.position.set(15, -4.5, 15);
+            stairs.rotation.x = Math.PI / 10; // Slight incline
+            ridgeZone.add(stairs);
+            
+            // Add coins on the ridge path and tower
+            const ridgeCoin1 = createCoin();
+            ridgeCoin1.position.set(15, 2, 10);
+            ridgeCoin1.userData.baseHeight = 2; // Store the base height
+            ridgeZone.add(ridgeCoin1);
+            
+            const ridgeCoin2 = createCoin();
+            ridgeCoin2.position.set(0, 17, 0); // On top of tower
+            ridgeCoin2.userData.baseHeight = 17; // Store the base height
+            ridgeZone.add(ridgeCoin2);
+            
+            scene.add(ridgeZone);
+            
+            // Connect zones with paths
+            const pathMaterial = new THREE.MeshLambertMaterial({ color: 0xccbb99 });
+            
+            // Path to Food Village
+            const pathToFoodGeo = new THREE.PlaneGeometry(40, 5);
+            const pathToFood = new THREE.Mesh(pathToFoodGeo, pathMaterial);
+            pathToFood.rotation.x = -Math.PI / 2;
+            pathToFood.position.set(15, 0.1, 10);
+            pathToFood.receiveShadow = true;
+            scene.add(pathToFood);
+            
+            // Path to Grove
+            const pathToGroveGeo = new THREE.PlaneGeometry(50, 5);
+            const pathToGrove = new THREE.Mesh(pathToGroveGeo, pathMaterial);
+            pathToGrove.rotation.x = -Math.PI / 2;
+            pathToGrove.rotation.z = Math.PI / 4;
+            pathToGrove.position.set(-20, 0.1, -15);
+            pathToGrove.receiveShadow = true;
+            scene.add(pathToGrove);
+            
+            // Path to Ridge
+            const pathToRidgeGeo = new THREE.PlaneGeometry(60, 5);
+            const pathToRidge = new THREE.Mesh(pathToRidgeGeo, pathMaterial);
+            pathToRidge.rotation.x = -Math.PI / 2;
+            pathToRidge.rotation.z = -Math.PI / 6;
+            pathToRidge.position.set(5, 0.1, -25);
+            pathToRidge.receiveShadow = true;
+            scene.add(pathToRidge);
+        }
+        
+        createWorld();
+        updateLoadingProgress();
+        
+        // Initialize weather system
+        weatherEffects.init();
+        
+        // Initialize interactive objects
+        interactiveObjects.init();
+        
+        // Show initial welcome message
+        showMessage("Welcome to the festival! Explore interactive attractions and collect gems.", 5000);
+
+        // Camera setup
+        camera.position.set(0, 10, 15);
+        camera.lookAt(birdGroup.position);
+        
+        // Control setup with both local variables and gameState
+        // Keep both for backward compatibility with keyboard controls
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        
+        // Direct control setup - simplified for testing
+        try {
+            const upBtn = document.getElementById('up-btn');
+            const leftBtn = document.getElementById('left-btn');
+            const rightBtn = document.getElementById('right-btn');
+            const downBtn = document.getElementById('down-btn');
+            const jumpBtn = document.getElementById('jump-btn');
+            
+            // Set initial control state
+            gameState.moveForward = false;
+            gameState.moveBackward = false;
+            gameState.moveLeft = false;
+            gameState.moveRight = false;
+            
+            // Direct control assignment with both local and gameState variables
+            upBtn.addEventListener('mousedown', () => { 
+                moveForward = true; 
+                gameState.moveForward = true;
+                console.log("Up button pressed");
+            });
+            upBtn.addEventListener('mouseup', () => { 
+                moveForward = false; 
+                gameState.moveForward = false;
+            });
+            
+            downBtn.addEventListener('mousedown', () => { 
+                moveBackward = true; 
+                gameState.moveBackward = true;
+            });
+            downBtn.addEventListener('mouseup', () => { 
+                moveBackward = false; 
+                gameState.moveBackward = false;
+            });
+            
+            leftBtn.addEventListener('mousedown', () => { 
+                moveLeft = true; 
+                gameState.moveLeft = true;
+            });
+            leftBtn.addEventListener('mouseup', () => { 
+                moveLeft = false; 
+                gameState.moveLeft = false;
+            });
+            
+            rightBtn.addEventListener('mousedown', () => { 
+                moveRight = true; 
+                gameState.moveRight = true;
+            });
+            rightBtn.addEventListener('mouseup', () => { 
+                moveRight = false; 
+                gameState.moveRight = false;
+            });
+            
+            // Also add touch events
+            upBtn.addEventListener('touchstart', () => { 
+                moveForward = true; 
+                gameState.moveForward = true;
+            });
+            upBtn.addEventListener('touchend', () => { 
+                moveForward = false; 
+                gameState.moveForward = false;
+            });
+            
+            downBtn.addEventListener('touchstart', () => { 
+                moveBackward = true; 
+                gameState.moveBackward = true;
+            });
+            downBtn.addEventListener('touchend', () => { 
+                moveBackward = false; 
+                gameState.moveBackward = false;
+            });
+            
+            leftBtn.addEventListener('touchstart', () => { 
+                moveLeft = true; 
+                gameState.moveLeft = true;
+            });
+            leftBtn.addEventListener('touchend', () => { 
+                moveLeft = false; 
+                gameState.moveLeft = false;
+            });
+            
+            rightBtn.addEventListener('touchstart', () => { 
+                moveRight = true; 
+                gameState.moveRight = true;
+            });
+            rightBtn.addEventListener('touchend', () => { 
+                moveRight = false; 
+                gameState.moveRight = false;
+            });
+            
+            // Jump button controls
+            if (jumpBtn) {
+                jumpBtn.addEventListener('mousedown', handleJump);
+                jumpBtn.addEventListener('touchstart', handleJump);
+            }
+            
+            function handleJump() {
+                // First press initializes jumping state
+                if (!gameState.isJumping) {
+                    gameState.isJumping = true;
+                    gameState.velocity = 0.3;
+                    if (sounds.jump) sounds.jump.play();
+                    console.log("Jump initiated");
+                } 
+                // Subsequent presses boost upward velocity
+                else {
+                    // Add boost (smaller than initial jump)
+                    gameState.velocity = Math.max(gameState.velocity, 0) + 0.2; 
+                    if (sounds.jump) sounds.jump.play();
+                    console.log("Jump boosted to:", gameState.velocity);
+                }
+            }
+        } catch (error) {
+            console.error("Error setting up controls:", error);
+        }
+        
+        // Keyboard controls for desktop
+        window.addEventListener('keydown', (e) => {
+            // Prevent default arrow key scrolling
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            
+            switch(e.key) {
+                case 'w': case 'ArrowUp': 
+                    moveForward = true;
+                    gameState.moveForward = true;
+                    break;
+                case 'a': case 'ArrowLeft': 
+                    moveLeft = true;
+                    gameState.moveLeft = true;
+                    break;
+                case 'd': case 'ArrowRight': 
+                    moveRight = true;
+                    gameState.moveRight = true;
+                    break;
+                case 's': case 'ArrowDown': 
+                    moveBackward = true;
+                    gameState.moveBackward = true;
+                    break;
+                case ' ': // Spacebar - Allow continuous flight with repeated presses
+                    // First jump initializes jumping state
+                    if (!gameState.isJumping) {
+                        gameState.isJumping = true;
+                        gameState.velocity = 0.3;
+                        if (sounds.jump) sounds.jump.play();
+                    } 
+                    // Subsequent presses boost upward velocity
+                    else {
+                        // Add upward boost (smaller than initial jump)
+                        gameState.velocity = Math.max(gameState.velocity, 0) + 0.2; 
+                        if (sounds.jump) sounds.jump.play();
+                    }
+                    console.log("SPACE: Boosting flight velocity to:", gameState.velocity);
+                    break;
+                case 'w': // Change weather (for testing)
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault(); // Don't trigger browser save
+                        startWeatherTransition();
+                        showMessage("Weather changing...");
+                    }
+                    break;
+                case 't': // Change time faster (for testing)
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        gameState.weather.timeOfDay = (gameState.weather.timeOfDay + 0.1) % 1;
+                        showMessage("Time changed to: " + 
+                            (gameState.weather.timeOfDay < 0.25 ? "Night" :
+                             gameState.weather.timeOfDay < 0.5 ? "Morning" :
+                             gameState.weather.timeOfDay < 0.75 ? "Afternoon" : "Evening"));
+                    }
+                    break;
+                case 'e': // Interact with nearby object
+                    if (gameState.canInteract && 
+                        gameState.interactiveObjects.currentNearbyObject) {
+                        interactiveObjects.interact();
+                    }
+                    break;
+            }
+            console.log("Keydown detected:", e.key, { moveForward, gameState_moveForward: gameState.moveForward });
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            switch(e.key) {
+                case 'w': case 'ArrowUp': 
+                    moveForward = false;
+                    gameState.moveForward = false;
+                    break;
+                case 'a': case 'ArrowLeft': 
+                    moveLeft = false;
+                    gameState.moveLeft = false;
+                    break;
+                case 'd': case 'ArrowRight': 
+                    moveRight = false;
+                    gameState.moveRight = false;
+                    break;
+                case 's': case 'ArrowDown': 
+                    moveBackward = false;
+                    gameState.moveBackward = false;
+                    break;
+            }
+        });
+        
+        // Screen tap/click for interaction - handles both coins and interactive objects
+        window.addEventListener('click', handleInteraction);
+        window.addEventListener('touchend', handleInteraction);
+        
+        function handleInteraction() {
+            // First priority: Interactive objects
+            if (gameState.canInteract && gameState.interactiveObjects.currentNearbyObject) {
+                interactiveObjects.interact();
+                return;
+            }
+            
+            // Second priority: Coin collection
+            if (gameState.canInteract && gameState.interactiveObject) {
+                // Handle coin interaction
+                if (gameState.interactiveObject.userData.isCoin) {
+                    // Collect coin
+                    gameState.coins++;
+                    document.getElementById('coins').textContent = `${gameState.coins}/${gameState.maxCoins}`;
+                    
+                    // Play coin sound
+                    if (sounds.coinPickup) sounds.coinPickup.play();
+                    
+                    // Show feedback
+                    showMessage(`Gem collected! ${gameState.coins}/${gameState.maxCoins}`);
+                    
+                    // Remove the coin
+                    scene.remove(gameState.interactiveObject);
+                    
+                    // Check if all coins collected
+                    if (gameState.coins >= gameState.maxCoins) {
+                        // Victory condition reached!
+                        showMessage("Congratulations! You've collected all the gems!", 6000);
+                        
+                        // Create a victory banner
+                        const victoryDiv = document.createElement('div');
+                        victoryDiv.style.position = 'absolute';
+                        victoryDiv.style.top = '50%';
+                        victoryDiv.style.left = '50%';
+                        victoryDiv.style.transform = 'translate(-50%, -50%)';
+                        victoryDiv.style.background = 'rgba(0,0,0,0.8)';
+                        victoryDiv.style.color = 'gold';
+                        victoryDiv.style.padding = '30px';
+                        victoryDiv.style.borderRadius = '10px';
+                        victoryDiv.style.fontSize = '28px';
+                        victoryDiv.style.textAlign = 'center';
+                        victoryDiv.style.zIndex = '900';
+                        victoryDiv.style.fontFamily = 'Courier New, monospace';
+                        victoryDiv.innerHTML = `
+                            <h2>🏆 VICTORY! 🏆</h2>
+                            <p>You collected all ${gameState.maxCoins} gems!</p>
+                            <p>Thanks for exploring the Virtual Park!</p>
+                            <p style="margin-top: 20px; font-size: 16px;">Click anywhere to continue exploring</p>
+                        `;
+                        document.body.appendChild(victoryDiv);
+                        
+                        // Remove victory screen on click
+                        victoryDiv.addEventListener('click', () => {
+                            victoryDiv.remove();
+                        });
+                    }
+                }
+                
+                // Reset interaction state
+                gameState.canInteract = false;
+                gameState.interactiveObject = null;
+            }
+        }
+        
+        // Check which zone player is in
+        function checkZone() {
+            const zones = [
+                { name: "Festival Plaza", position: new THREE.Vector3(0, 0, 0), radius: 25 },
+                { name: "Food & Bar Village", position: new THREE.Vector3(30, 0, 20), radius: 20 },
+                { name: "Cultural Grove", position: new THREE.Vector3(-40, 0, -30), radius: 30 },
+                { name: "Outpost Ridge", position: new THREE.Vector3(10, 5, -50), radius: 20 }
+            ];
+            
+            let currentZone = "Wilderness";
+            let minDist = Infinity;
+            
+            for (const zone of zones) {
+                const dist = birdGroup.position.distanceTo(zone.position);
+                if (dist < zone.radius && dist < minDist) {
+                    currentZone = zone.name;
+                    minDist = dist;
+                }
+            }
+            
+            if (currentZone !== gameState.currentZone) {
+                gameState.currentZone = currentZone;
+                document.getElementById('location').textContent = currentZone;
+                
+                // Could trigger zone-specific music or effects here
+            }
+        }
+        
+        // Check for collectibles and interactive objects
+        function checkInteractions() {
+            // Reset interaction state
+            gameState.canInteract = false;
+            gameState.interactiveObject = null;
+            
+            // Check for coins (using simple distance)
+            scene.traverse((object) => {
+                if (object.userData && object.userData.isCoin) {
+                    // Get coin's world position (accounting for parent transformations)
+                    const coinWorldPos = new THREE.Vector3();
+                    object.getWorldPosition(coinWorldPos);
+                    
+                    // Calculate distance using world positions, not local
+                    const distance = coinWorldPos.distanceTo(birdGroup.position);
+                    
+                    // ONLY process coins that haven't been collected yet
+                    if (!object.userData.collected) {
+                        // Make all coins visible from a distance by bouncing and rotating
+                        object.rotation.y += 0.03;
+                        
+                        // Adjust the coin's height based on original position
+                        const baseHeight = object.userData.baseHeight || 1;
+                        
+                        // Visual bouncing effect (only affects rendering, not collision)
+                        object.position.y = baseHeight + Math.sin(Date.now() * 0.003) * 0.3;
+                        
+                        // Debug output - show ALL active coins (with world positions)
+                        const coinWorldPos = new THREE.Vector3();
+                        object.getWorldPosition(coinWorldPos);
+                        
+                        console.log("COIN: Zone=" + (object.parent ? object.parent.name : "scene") + 
+                                   ", distance=" + distance.toFixed(2) +
+                                   ", worldPos=" + coinWorldPos.toArray().map(n => n.toFixed(1)) +
+                                   ", bird=" + birdGroup.position.toArray().map(n => n.toFixed(1)));
+                        
+                        // When approaching coins, make them more noticeable
+                        if (distance < 10) {
+                            // Bounce higher and rotate faster when close
+                            object.position.y = baseHeight + Math.sin(Date.now() * 0.006) * 0.8;
+                            object.rotation.y += 0.08;
+                            
+                            // Generate sparkles or glow effect when very close
+                            if (distance < 5) {
+                                object.rotation.y += 0.1; // Spin even faster
+                                
+                                // FORCE COLLECTION at close range - guaranteed to work
+                                if (distance < 4) {
+                                    // Get world position for accurate placement
+                                    const coinWorldPos = new THREE.Vector3();
+                                    object.getWorldPosition(coinWorldPos);
+                                    
+                                    console.log("COLLECTING COIN!");
+                                    console.log("Zone:", object.parent ? object.parent.name : "scene");
+                                    console.log("Distance:", distance.toFixed(2));
+                                    console.log("World position:", coinWorldPos.toArray().map(n => n.toFixed(2)));
+                                    console.log("Bird position:", birdGroup.position.toArray().map(n => n.toFixed(2)));
+                                    
+                                    // Mark as collected BEFORE collecting to prevent double collection
+                                    object.userData.collected = true;
+                                    
+                                    // Save world position in the coin for particle effects
+                                    object.userData.worldPos = coinWorldPos;
+                                    
+                                    // Collect the coin with world position
+                                    collectCoin(object);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Function to collect a coin with animation
+        function collectCoin(coin) {
+            // Collect coin (increment counter)
+            gameState.coins++;
+            document.getElementById('coins').textContent = `${gameState.coins}/${gameState.maxCoins}`;
+            
+            // Play coin sound
+            if (sounds.coinPickup) sounds.coinPickup.play();
+            
+            // Show feedback
+            showMessage(`Gem collected! ${gameState.coins}/${gameState.maxCoins}`);
+            
+            // Dramatic collection animation using world position
+            let explosionPos;
+            
+            // Use stored world position if available, otherwise fall back to direct position
+            if (coin.userData.worldPos) {
+                explosionPos = coin.userData.worldPos;
+            } else {
+                // Get world position as fallback
+                explosionPos = new THREE.Vector3();
+                if (coin.parent) {
+                    coin.getWorldPosition(explosionPos);
+                } else {
+                    explosionPos.copy(coin.position);
+                }
+            }
+            
+            console.log("Creating particles at:", explosionPos.toArray().map(n => n.toFixed(2)));
+            
+            // Create explosion particles
+            for (let i = 0; i < 15; i++) {
+                const particleGeo = new THREE.SphereGeometry(0.2, 4, 4);
+                const particleMat = new THREE.MeshBasicMaterial({
+                    color: 0xffff00, 
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const particle = new THREE.Mesh(particleGeo, particleMat);
+                
+                // Set particle directly in scene at world position
+                particle.position.copy(explosionPos);
+                
+                // Give particle random velocity
+                particle.userData.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.3,
+                    Math.random() * 0.5,
+                    (Math.random() - 0.5) * 0.3
+                );
+                
+                // Add to scene
+                scene.add(particle);
+                
+                // Remove after animation
+                setTimeout(() => {
+                    scene.remove(particle);
+                }, 1000);
+                
+                // Add to animation loop
+                gameState.particles = gameState.particles || [];
+                gameState.particles.push(particle);
+            }
+            
+            // Make sure coin is fully removed from the scene
+            if (coin.parent) {
+                coin.parent.remove(coin);
+            } else {
+                scene.remove(coin);
+            }
+            
+            // Ensure coin is marked as collected
+            coin.userData.collected = true;
+            
+            // Check if all coins collected
+            if (gameState.coins >= gameState.maxCoins) {
+                // Victory condition reached!
+                showMessage("Congratulations! You've collected all the gems!", 6000);
+                
+                // Create a victory banner
+                const victoryDiv = document.createElement('div');
+                victoryDiv.style.position = 'absolute';
+                victoryDiv.style.top = '50%';
+                victoryDiv.style.left = '50%';
+                victoryDiv.style.transform = 'translate(-50%, -50%)';
+                victoryDiv.style.background = 'rgba(0,0,0,0.8)';
+                victoryDiv.style.color = 'gold';
+                victoryDiv.style.padding = '30px';
+                victoryDiv.style.borderRadius = '10px';
+                victoryDiv.style.fontSize = '28px';
+                victoryDiv.style.textAlign = 'center';
+                victoryDiv.style.zIndex = '900';
+                victoryDiv.style.fontFamily = 'Courier New, monospace';
+                victoryDiv.innerHTML = `
+                    <h2>🏆 VICTORY! 🏆</h2>
+                    <p>You collected all ${gameState.maxCoins} gems!</p>
+                    <p>Thanks for exploring the Virtual Park!</p>
+                    <p style="margin-top: 20px; font-size: 16px;">Click anywhere to continue exploring</p>
+                `;
+                document.body.appendChild(victoryDiv);
+                
+                // Remove victory screen on click
+                victoryDiv.addEventListener('click', () => {
+                    victoryDiv.remove();
+                });
+            }
+        }
+        
+        // Handle collision detection
+        function handleCollisions() {
+            // Update bird bounding box
+            birdBoundingBox.setFromObject(birdGroup);
+            
+            let collision = false;
+            
+            // Check if we're within world bounds (don't let bird escape playfield)
+            const worldSize = 200; // Size of the ground
+            if (Math.abs(birdGroup.position.x) > worldSize/2 || 
+                Math.abs(birdGroup.position.z) > worldSize/2) {
+                // Push bird back if trying to exit world bounds
+                if (birdGroup.position.x > worldSize/2) birdGroup.position.x = worldSize/2;
+                if (birdGroup.position.x < -worldSize/2) birdGroup.position.x = -worldSize/2;
+                if (birdGroup.position.z > worldSize/2) birdGroup.position.z = worldSize/2;
+                if (birdGroup.position.z < -worldSize/2) birdGroup.position.z = -worldSize/2;
+                collision = true;
+            }
+            
+            // Check collisions with world objects
+            for (const obj of worldObjects) {
+                // Update the object's bounding box (important for dynamic objects)
+                if (obj.userData && obj.userData.boundingBox) {
+                    obj.userData.boundingBox.setFromObject(obj);
+                    
+                    if (birdBoundingBox.intersectsBox(obj.userData.boundingBox)) {
+                        // Simple collision response: push back slightly
+                        const pushDirection = new THREE.Vector3()
+                            .subVectors(birdGroup.position, obj.position)
+                            .normalize()
+                            .multiplyScalar(0.5);
+                        
+                        // Apply push with more force
+                        birdGroup.position.add(pushDirection);
+                        collision = true;
+                    }
+                }
+            }
+            
+            // Special handling for the ridge platform
+            // Check if bird is over Outpost Ridge but below its height
+            if (birdGroup.position.x > -10 && birdGroup.position.x < 30 && 
+                birdGroup.position.z > -60 && birdGroup.position.z < -40) {
+                if (birdGroup.position.y < 5 && !gameState.isJumping) {
+                    // Push bird up to ridge level
+                    birdGroup.position.y = 5;
+                }
+            }
+            
+            return collision;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Bird movement based on controls
+            moveDirection.set(0, 0, 0);
+            
+            // Use either control system - local or gameState
+            // We'll apply direct movement for testing
+            const forward = gameState.moveForward || moveForward;
+            const backward = gameState.moveBackward || moveBackward;
+            const left = gameState.moveLeft || moveLeft;
+            const right = gameState.moveRight || moveRight;
+            
+            // Zelda-style movement: character always moves in the direction they're facing
+            // and camera follows behind
+            
+            // First, handle rotation based on left/right inputs
+            const rotationSpeed = 0.05;
+            if (left) {
+                // Rotate bird counter-clockwise
+                birdGroup.rotation.y += rotationSpeed;
+                console.log("Rotating LEFT, angle:", birdGroup.rotation.y);
+            }
+            if (right) {
+                // Rotate bird clockwise
+                birdGroup.rotation.y -= rotationSpeed;
+                console.log("Rotating RIGHT, angle:", birdGroup.rotation.y);
+            }
+            
+            // Then move forward/backward in the direction the bird is facing
+            if (forward || backward) {
+                // Calculate movement direction based on bird's current rotation
+                const moveSpeed = forward ? 0.5 : -0.25; // slower when moving backward
+                
+                // Use the bird's orientation to determine movement direction
+                // In THREE.js, rotation.y is the angle around the Y axis (horizontal rotation)
+                const directionX = Math.sin(birdGroup.rotation.y);
+                const directionZ = Math.cos(birdGroup.rotation.y);
+                
+                // Move in the direction the bird is facing
+                birdGroup.position.x += directionX * moveSpeed;
+                birdGroup.position.z += directionZ * moveSpeed;
+                
+                console.log("Moving in facing direction:", 
+                    forward ? "FORWARD" : "BACKWARD", 
+                    "New position:", 
+                    birdGroup.position.toArray().map(n => n.toFixed(2)));
+            }
+            
+            // Wing animation - flap faster when moving forward
+            const isMoving = forward || backward;
+            const wingSpeed = Date.now() * (isMoving ? 0.015 : 0.005);
+            const wingAmplitude = isMoving ? 0.6 : 0.2;
+            
+            // Apply wing animations
+            if (leftWing && rightWing) {
+                leftWing.rotation.z = Math.sin(wingSpeed) * wingAmplitude;
+                rightWing.rotation.z = -Math.sin(wingSpeed) * wingAmplitude;
+            }
+            
+            // Skip the normal movement code
+            moveDirection.set(0, 0, 0);
+            
+            // Check for collisions and provide feedback
+            // (store current position before collision check)
+            const prevPos = birdGroup.position.clone();
+            
+            // Check for collisions and revert if needed
+            if (handleCollisions()) {
+                // Return to previous position if collision detected
+                birdGroup.position.copy(prevPos);
+                
+                // Visual feedback for collision
+                const hitFlash = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.5, 8, 8),
+                    new THREE.MeshBasicMaterial({ 
+                        color: 0xff0000, 
+                        transparent: true, 
+                        opacity: 0.5 
+                    })
+                );
+                hitFlash.position.copy(birdGroup.position);
+                scene.add(hitFlash);
+                
+                // Remove the flash after a short time
+                setTimeout(() => {
+                    scene.remove(hitFlash);
+                }, 200);
+            }
+            
+            // isMoving state for other parts of the code
+            const isMovingState = forward || backward || left || right;
+            
+            // Apply jumping/flying mechanics
+            if (gameState.isJumping) {
+                // Apply upward velocity
+                birdGroup.position.y += gameState.velocity;
+                
+                // Gradually reduce velocity (gravity)
+                gameState.velocity -= gameState.gravity;
+                
+                // Allow repeated jumps to fly higher by checking for space press
+                // This is handled in the keydown event
+                
+                // Check for landing
+                if (birdGroup.position.y <= 2 && gameState.velocity < 0) {
+                    birdGroup.position.y = 2;
+                    gameState.isJumping = false;
+                    gameState.velocity = 0;
+                }
+                
+                // Cap maximum height
+                const maxHeight = 30;
+                if (birdGroup.position.y > maxHeight) {
+                    birdGroup.position.y = maxHeight;
+                    gameState.velocity = 0; // Stop upward momentum at max height
+                }
+                
+                console.log("Jumping/Flying - Height:", birdGroup.position.y.toFixed(2), 
+                          "Velocity:", gameState.velocity.toFixed(2));
+            } else {
+                // Gentle bob when at default flying height
+                birdGroup.position.y = 2 + Math.sin(Date.now() * 0.002) * 0.1;
+            }
+            
+            // Classic Zelda-style camera (follows behind character)
+            const birdPos = birdGroup.position;
+            
+            // Calculate camera position based on bird rotation (always behind)
+            const cameraDistance = 10; // Distance behind bird
+            const cameraHeight = 5;    // Height above bird
+            const cameraLag = 0.08;    // How quickly camera catches up (lower = smoother)
+            
+            // Calculate ideal camera position (always behind the bird)
+            const angle = birdGroup.rotation.y; // Bird's current facing angle
+            
+            // Position camera behind the bird using the bird's rotation angle
+            // For the Zelda camera, we need to be directly behind the character
+            const targetCameraPos = new THREE.Vector3(
+                birdPos.x - Math.sin(angle) * cameraDistance,  // X position behind bird
+                birdPos.y + cameraHeight,                       // Y position above bird
+                birdPos.z - Math.cos(angle) * cameraDistance   // Z position behind bird
+            );
+            
+            // Smoothly move camera toward target position
+            camera.position.lerp(targetCameraPos, cameraLag);
+            
+            // Camera always looks directly at the bird
+            camera.lookAt(birdPos);
+            
+            // Update zone and interaction status
+            checkZone();
+            checkInteractions();
+            
+            // Update interactive objects
+            interactiveObjects.update(birdGroup.position);
+            
+            // Update dynamic weather system
+            updateWeatherSystem();
+            updateSkyForTimeOfDay(gameState.weather.timeOfDay);
+            updateLighting();
+            weatherEffects.update();
+            
+            // Animate coins - but only if they're not already collected
+            scene.traverse((object) => {
+                if (object.userData && object.userData.isCoin && !object.userData.collected) {
+                    // Add constant rotation regardless of bouncing
+                    object.rotation.y += 0.02;
+                }
+            });
+            
+            // Animate particles from coin collection
+            if (gameState.particles && gameState.particles.length > 0) {
+                for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                    const particle = gameState.particles[i];
+                    if (particle) {
+                        // Apply velocity
+                        if (particle.userData.velocity) {
+                            particle.position.x += particle.userData.velocity.x;
+                            particle.position.y += particle.userData.velocity.y;
+                            particle.position.z += particle.userData.velocity.z;
+                            
+                            // Apply gravity
+                            particle.userData.velocity.y -= 0.01;
+                            
+                            // Fade out
+                            if (particle.material.opacity > 0.01) {
+                                particle.material.opacity -= 0.01;
+                            } else {
+                                // Remove fully faded particles
+                                scene.remove(particle);
+                                gameState.particles.splice(i, 1);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Start animation
+        animate();
+        
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
