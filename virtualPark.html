@@ -1641,8 +1641,12 @@
         // Create fallback immediately to ensure something is visible
         createFallbackSky();
         
+        // Debug the sky object
+        console.log("Skybox material:", skyObject.material);
+        
         // Update sky based on time of day and weather
         function updateSkyForTimeOfDay(timeOfDay) {
+            console.log("Updating sky for time:", timeOfDay);
             if (skyAdvanced && skyUniforms) {
                 // Calculate sun position based on time of day
                 // Time of day: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1 = midnight
@@ -1672,36 +1676,47 @@
                 skyUniforms['rayleigh'].value = 2 + (gameState.weather.cloudCover * 1);
             }
             else if (skyObject && skyObject.material) {
-                // Update basic sky color based on time of day
-                let skyColor;
-                let isNight = false; // Flag to control star visibility
+                // COMPLETELY REVISED SKY COLOR SYSTEM
+                // Directly set colors based on time without transitions
+                const skyColorMap = {
+                    0.0: 0x000814,  // Midnight - almost black with hint of blue
+                    0.25: 0xe0c080, // Dawn - orange sunrise
+                    0.35: 0x87ceeb, // Morning - light blue
+                    0.5: 0x0080ff,  // Noon - deeper blue
+                    0.65: 0x87ceeb, // Afternoon - light blue again
+                    0.75: 0xc95b0d, // Sunset - deep orange
+                    0.9: 0x0a1030   // Night - deep blue
+                };
                 
-                if (timeOfDay < 0.25) { // Night to sunrise
-                    // Interpolate from dark blue to light blue/orange
-                    const t = timeOfDay / 0.25;
-                    skyColor = new THREE.Color(0x0a1030).lerp(new THREE.Color(0xe0c080), t);
-                    isNight = timeOfDay < 0.2; // Stars visible before dawn
-                }
-                else if (timeOfDay < 0.5) { // Sunrise to noon
-                    // Interpolate from light orange to blue
-                    const t = (timeOfDay - 0.25) / 0.25;
-                    skyColor = new THREE.Color(0xe0c080).lerp(new THREE.Color(0x87ceeb), t);
-                    isNight = false; // No stars during day
-                }
-                else if (timeOfDay < 0.75) { // Noon to sunset
-                    // Interpolate from blue to orange
-                    const t = (timeOfDay - 0.5) / 0.25;
-                    skyColor = new THREE.Color(0x87ceeb).lerp(new THREE.Color(0xe0c080), t);
-                    isNight = false; // No stars during day
-                }
-                else { // Sunset to night
-                    // Interpolate from orange to dark blue
-                    const t = (timeOfDay - 0.75) / 0.25;
-                    skyColor = new THREE.Color(0xe0c080).lerp(new THREE.Color(0x0a1030), t);
-                    isNight = timeOfDay > 0.85; // Stars visible after sunset
+                // Get exact time from our fixed times or the closest one
+                let exactTime = timeOfDay;
+                const times = Object.keys(skyColorMap).map(Number);
+                
+                // Find the closest fixed time point
+                let closestTime = times[0];
+                let minDistance = Math.abs(timeOfDay - closestTime);
+                
+                for (let i = 1; i < times.length; i++) {
+                    const distance = Math.abs(timeOfDay - times[i]);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestTime = times[i];
+                    }
                 }
                 
-                // Adjust for cloud cover - more clouds means whiter/grayer sky
+                // Use the color for that time
+                const skyColorHex = skyColorMap[closestTime];
+                const skyColor = new THREE.Color(skyColorHex);
+                
+                // Debug color change
+                console.log("Setting sky color for time " + timeOfDay + 
+                           " (using " + closestTime + ")" +
+                           " to color #" + skyColor.getHexString());
+                
+                // Check if it's night for star visibility
+                const isNight = (closestTime === 0.0 || closestTime === 0.9);
+                
+                // Apply cloud effects if needed
                 if (gameState.weather.cloudCover > 0) {
                     // Get a value between 0 and 1 based on cloud cover
                     const cloudFactor = gameState.weather.cloudCover;
@@ -1716,45 +1731,42 @@
                     }
                 }
                 
-                // Apply color to sky - make darker at night  
-                if (timeOfDay < 0.1 || timeOfDay > 0.9) {
-                    // Deep night - dark blue/black
-                    skyObject.material.color = new THREE.Color(0x000814);
-                } else {
-                    skyObject.material.color = skyColor;
+                // Apply color to entire skybox dome
+                if (skyObject.material) {
+                    // Set a new material with the correct color to force a refresh
+                    skyObject.material = new THREE.MeshBasicMaterial({
+                        color: skyColor,
+                        side: THREE.BackSide
+                    });
+                    console.log("New sky material created with color:", skyColor);
                 }
                 
                 // Show/hide stars based on time of day
                 if (skyObject.userData.starGroup) {
-                    // Stars are visible at night and partially visible at dawn/dusk
+                    // Stars are visible at night only
                     const starGroup = skyObject.userData.starGroup;
                     
+                    // Force star visibility based on our time mapping
+                    starGroup.visible = isNight;
+                    console.log("Star visibility set to:", isNight);
+                    
                     if (isNight) {
-                        // Show stars with proper opacity based on how dark it is
-                        starGroup.visible = true;
-                        
-                        // Get a value between 0 and 1 for how deep into night we are
-                        let nightFactor = 0;
-                        if (timeOfDay < 0.1) {
-                            nightFactor = 1 - timeOfDay / 0.1; // First half of night
-                        } else if (timeOfDay > 0.9) {
-                            nightFactor = (timeOfDay - 0.9) / 0.1; // Second half of night
-                        } else if (timeOfDay < 0.2) {
-                            nightFactor = 1 - (timeOfDay - 0.1) / 0.1; // Dawn approach
-                        } else if (timeOfDay > 0.8) {
-                            nightFactor = (timeOfDay - 0.8) / 0.1; // Dusk approach
-                        }
-                        
-                        // Apply opacity to star material
+                        // Set stars to full opacity at night
                         starGroup.children.forEach(child => {
                             if (child.material) {
-                                child.material.opacity = Math.min(0.8, nightFactor * 0.8);
+                                child.material.opacity = 0.9;
                             }
                         });
-                    } else {
-                        // Hide stars during day
-                        starGroup.visible = false;
                     }
+                    
+                    // Log star status
+                    console.log("Star group status:", {
+                        exists: !!starGroup,
+                        visible: starGroup.visible,
+                        childCount: starGroup.children.length
+                    });
+                } else {
+                    console.warn("No star group found on sky object!");
                 }
             }
         }
@@ -2353,6 +2365,10 @@
                         gameState.weather.timeOfDay = timePositions[nextTimeIndex];
                         console.log("Setting time to:", gameState.weather.timeOfDay);
                         
+                        // Create a dramatic console log to force attention
+                        console.log("%c TIME CHANGED TO " + gameState.weather.timeOfDay.toFixed(2) + "! ", 
+                                  "background: #ff0000; color: white; font-size: 20px;");
+                        
                         // Force sky and lighting update with the new time
                         updateSkyForTimeOfDay(gameState.weather.timeOfDay);
                         updateLighting();
@@ -2904,18 +2920,10 @@
             updateLighting();
             weatherEffects.update();
             
-            // Force redraw of stars every frame for night sky effect
-            if (skyObject && skyObject.userData.starGroup) {
-                const timeOfDay = gameState.weather.timeOfDay;
-                const isNight = timeOfDay < 0.2 || timeOfDay > 0.85;
-                skyObject.userData.starGroup.visible = isNight;
-                
-                // Log once per second for debugging
-                if (Math.floor(Date.now() / 1000) % 5 === 0 && Math.floor(Date.now() / 100) % 10 === 0) {
-                    console.log("Sky update: Time =", timeOfDay.toFixed(2), 
-                                "Sky color =", skyObject.material.color.getHexString(),
-                                "Stars visible =", skyObject.userData.starGroup.visible);
-                }
+            // Forced update of sky every few seconds to ensure it changes
+            if (Math.floor(Date.now() / 1000) % 3 === 0) {
+                // Force a full sky update periodically
+                updateSkyForTimeOfDay(gameState.weather.timeOfDay);
             }
             
             // Animate coins - but only if they're not already collected
