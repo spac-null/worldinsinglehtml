@@ -2193,10 +2193,18 @@
                 case 'w': // Change weather (for testing)
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault(); // Don't trigger browser save
+                        console.log("CTRL+W detected - changing weather");
                         // Fix manual weather change
                         if (!gameState.weather.transitionActive) {
-                            startWeatherTransition();
-                            showMessage("Weather changing...");
+                            // Get all possible weather states
+                            const possibleStates = ["clear", "cloudy", "rainy"];
+                            // Don't transition to the same state
+                            let newStates = possibleStates.filter(s => s !== gameState.weather.currentState);
+                            // Pick a random new state
+                            gameState.weather.nextState = newStates[Math.floor(Math.random() * newStates.length)];
+                            gameState.weather.transitionProgress = 0;
+                            gameState.weather.transitionActive = true;
+                            showMessage("Weather changing to " + gameState.weather.nextState + "...");
                         } else {
                             showMessage("Weather already changing...");
                         }
@@ -2205,11 +2213,38 @@
                 case 't': // Change time faster (for testing)
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
-                        gameState.weather.timeOfDay = (gameState.weather.timeOfDay + 0.1) % 1;
-                        showMessage("Time changed to: " + 
-                            (gameState.weather.timeOfDay < 0.25 ? "Night" :
-                             gameState.weather.timeOfDay < 0.5 ? "Morning" :
-                             gameState.weather.timeOfDay < 0.75 ? "Afternoon" : "Evening"));
+                        console.log("CTRL+T detected - changing time of day");
+                        // Increment time by 3 hours (0.125 of a day)
+                        gameState.weather.timeOfDay = (gameState.weather.timeOfDay + 0.125) % 1;
+                        
+                        // Update sky and lighting for new time
+                        updateSkyForTimeOfDay(gameState.weather.timeOfDay);
+                        updateLighting();
+                        
+                        // Show message about time change
+                        const timeNames = {
+                            dawn: "Dawn (Sunrise)",
+                            morning: "Morning",
+                            noon: "Noon",
+                            afternoon: "Afternoon",
+                            sunset: "Sunset",
+                            evening: "Evening",
+                            night: "Night",
+                            midnight: "Midnight"
+                        };
+                        
+                        let timeName;
+                        if (gameState.weather.timeOfDay < 0.125) timeName = timeNames.midnight;
+                        else if (gameState.weather.timeOfDay < 0.25) timeName = timeNames.night;
+                        else if (gameState.weather.timeOfDay < 0.3) timeName = timeNames.dawn;
+                        else if (gameState.weather.timeOfDay < 0.4) timeName = timeNames.morning;
+                        else if (gameState.weather.timeOfDay < 0.55) timeName = timeNames.noon;
+                        else if (gameState.weather.timeOfDay < 0.7) timeName = timeNames.afternoon;
+                        else if (gameState.weather.timeOfDay < 0.8) timeName = timeNames.sunset;
+                        else if (gameState.weather.timeOfDay < 0.9) timeName = timeNames.evening;
+                        else timeName = timeNames.night;
+                        
+                        showMessage("Time changed to: " + timeName);
                     }
                     break;
                 case 'e': // Interact with nearby object
