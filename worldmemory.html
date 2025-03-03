@@ -1,0 +1,4616 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>3D File Explorer - Memory Palace</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0a0a18;
+            --text-color: #e0e0e0;
+            --accent-color: #00b3ff;
+            --secondary-color: #8e44ad;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #world {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #sidebar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100%;
+            background-color: rgba(10, 10, 24, 0.85);
+            padding: 15px;
+            box-sizing: border-box;
+            transform: translateX(-280px);
+            transition: transform 0.3s ease;
+            z-index: 100;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+            border-right: 1px solid rgba(0, 179, 255, 0.3);
+        }
+
+        #sidebar.open {
+            transform: translateX(0);
+        }
+
+        #toggle-sidebar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 45px;
+            height: 45px;
+            background-color: rgba(10, 10, 24, 0.8);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            color: var(--accent-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 22px;
+            z-index: 101;
+            box-shadow: 0 0 10px rgba(0, 179, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        #toggle-sidebar:hover {
+            background-color: rgba(0, 179, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 179, 255, 0.5);
+        }
+
+        .file-item {
+            margin: 10px 0;
+            padding: 12px 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            background-color: rgba(0, 179, 255, 0.2);
+            border-left: 3px solid var(--accent-color);
+            transform: translateX(5px);
+        }
+
+        .file-item.active {
+            background-color: rgba(0, 179, 255, 0.3);
+            border-left: 3px solid var(--accent-color);
+            box-shadow: 0 0 8px rgba(0, 179, 255, 0.3);
+        }
+
+        .file-icon {
+            margin-right: 10px;
+            font-size: 18px;
+            color: var(--accent-color);
+        }
+
+        .file-name {
+            flex-grow: 1;
+        }
+
+        .file-category {
+            font-size: 11px;
+            background-color: rgba(0, 179, 255, 0.2);
+            padding: 3px 6px;
+            border-radius: 10px;
+            color: var(--accent-color);
+        }
+
+        .sidebar-title {
+            margin: 0 0 20px 0;
+            font-size: 1.3rem;
+            color: var(--accent-color);
+            border-bottom: 1px solid rgba(0, 179, 255, 0.3);
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            margin: 20px 0 10px 0;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #content-viewer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 65%;
+            height: 100%;
+            background-color: rgba(10, 10, 24, 0.9);
+            z-index: 99;
+            display: none;
+            transition: all 0.3s ease;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+            border-left: 1px solid rgba(0, 179, 255, 0.3);
+        }
+
+        #viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid rgba(0, 179, 255, 0.3);
+        }
+
+        #viewer-title {
+            font-size: 1.1rem;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+        }
+
+        #viewer-title::before {
+            content: "📄";
+            margin-right: 10px;
+            font-size: 1.3rem;
+        }
+
+        #close-viewer {
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        #close-viewer:hover {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border-color: #e74c3c;
+        }
+
+        #content-frame {
+            width: 100%;
+            height: calc(100% - 51px);
+            border: none;
+            background-color: white;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-size: 18px;
+            color: var(--accent-color);
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .loading-progress {
+            margin-top: 15px;
+            width: 300px;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .loading-bar {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 5px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(0, 179, 255, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .glow {
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px rgba(0, 179, 255, 0.5);
+            }
+
+            to {
+                text-shadow: 0 0 20px rgba(0, 179, 255, 0.8);
+            }
+        }
+
+        #controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(10, 10, 24, 0.8);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 90;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 179, 255, 0.3);
+            backdrop-filter: blur(5px);
+        }
+
+        .controls-row {
+            display: flex;
+            margin: 5px 0;
+        }
+
+        .controls-key {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 3px 8px;
+            margin-right: 8px;
+            color: var(--accent-color);
+            font-weight: bold;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .controls-action {
+            color: var(--text-color);
+        }
+
+        #mini-map {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 200px;
+            background-color: rgba(10, 10, 24, 0.8);
+            border-radius: 50%;
+            overflow: hidden;
+            z-index: 90;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 179, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        #mini-map:hover {
+            transform: scale(1.1);
+        }
+
+        #mini-map-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #player-position {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 98;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+
+        #crosshair::before {
+            top: 9px;
+            left: 0;
+            width: 20px;
+            height: 2px;
+        }
+
+        #crosshair::after {
+            top: 0;
+            left: 9px;
+            width: 2px;
+            height: 20px;
+        }
+
+        #crosshair.active::before,
+        #crosshair.active::after {
+            background-color: var(--accent-color);
+            box-shadow: 0 0 5px var(--accent-color);
+        }
+
+        #file-hover-info {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(10, 10, 24, 0.85);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 95;
+            display: none;
+            white-space: nowrap;
+            text-align: center;
+            border: 1px solid rgba(0, 179, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            max-width: 50%;
+        }
+
+        .file-hover-name {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .file-hover-desc {
+            color: var(--text-color);
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        #area-name {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(10, 10, 24, 0.7);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            color: var(--accent-color);
+            z-index: 95;
+            text-align: center;
+            border: 1px solid rgba(0, 179, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            transition: opacity 0.5s ease;
+            opacity: 0;
+        }
+
+        #area-name.visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">
+            <div class="glow">Loading Memory Palace...</div>
+            <div style="margin-top: 10px; font-size: 14px; opacity: 0.7;">Preparing your personalized file explorer
+            </div>
+        </div>
+        <div class="loading-progress">
+            <div class="loading-bar" id="loading-bar"></div>
+        </div>
+    </div>
+
+    <div id="world"></div>
+
+    <button id="toggle-sidebar">☰</button>
+
+    <div id="sidebar">
+        <h2 class="sidebar-title">Memory Palace Explorer</h2>
+
+        <div class="section-title">Locations</div>
+        <div id="location-list"></div>
+
+        <div class="section-title">Files</div>
+        <div id="file-list"></div>
+    </div>
+
+    <div id="content-viewer">
+        <div id="viewer-header">
+            <div id="viewer-title">filename.html</div>
+            <button id="close-viewer" title="Close Viewer">×</button>
+        </div>
+        <iframe id="content-frame" src="about:blank"></iframe>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="file-hover-info">
+        <div class="file-hover-name">Filename</div>
+        <div class="file-hover-desc">Description of the file will appear here</div>
+    </div>
+
+    <div id="area-name">Central Hub</div>
+
+    <div id="controls-info">
+        <div class="controls-title" style="margin-bottom: 8px; color: var(--accent-color); font-weight: bold;">Controls:
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">W</div>
+            <div class="controls-action">Move Forward</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">S</div>
+            <div class="controls-action">Move Backward</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">A</div>
+            <div class="controls-action">Move Left</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">D</div>
+            <div class="controls-action">Move Right</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">E</div>
+            <div class="controls-action">Toggle Explorer</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">Q</div>
+            <div class="controls-action">Toggle Mini-map</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">Mouse</div>
+            <div class="controls-action">Look Around</div>
+        </div>
+        <div class="controls-row">
+            <div class="controls-key">Click</div>
+            <div class="controls-action">Select File</div>
+        </div>
+    </div>
+
+    <div id="mini-map">
+        <canvas id="mini-map-canvas"></canvas>
+        <div id="player-position"></div>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            // World settings
+            worldSize: 150,
+            groundColor: 0x2E7D32, // Deeper forest green
+
+            // Distinct areas
+            areas: [
+                { name: "Central Hub", radius: 20, position: { x: 0, z: 0 }, color: 0x3498db },
+                { name: "Forest Library", radius: 15, position: { x: -40, z: -30 }, color: 0x2ecc71 },
+                { name: "Tech Sanctum", radius: 15, position: { x: 40, z: -30 }, color: 0xe74c3c },
+                { name: "Knowledge Waterfalls", radius: 15, position: { x: 0, z: 50 }, color: 0x9b59b6 }
+            ],
+
+            // File objects
+            objectBaseSize: 1.5,
+            objectSpacing: 12,
+
+            // Controls
+            movementSpeed: 0.6,
+            lookSpeed: 0.0015,
+
+            // Sidebar
+            sidebarOpen: false,
+
+            // Mini-map
+            miniMapVisible: true,
+            currentMovementScale: 1.0,
+            
+            // Performance settings
+            maxAnimationObjects: 100,
+            lowPolyMode: false,
+            minMapUpdateInterval: 100,  // ms between minimap updates
+            shadowQuality: 'medium',    // low, medium, high
+            objectDetail: 'medium',     // low, medium, high
+            environmentDensity: 'medium'// low, medium, high
+        };
+
+        // File data with categories and descriptions
+        const files = [
+            {
+                name: 'jascha.html',
+                path: 'snippets/index.html',
+                type: 'html',
+                area: 'Central Hub',
+                category: 'Main',
+                color: 0x3498db,
+                description: 'Main entry page with navigation and overview of the site structure.'
+            },
+            {
+                name: 'about.html',
+                path: 'snippets/about.html',
+                type: 'html',
+                area: 'Central Hub',
+                category: 'Info',
+                color: 0x2ecc71,
+                description: 'Information about the project and its purpose.'
+            },
+            {
+                name: 'contact.html',
+                path: 'snippets/contact.html',
+                type: 'html',
+                area: 'Central Hub',
+                category: 'Info',
+                color: 0x9b59b6,
+                description: 'Contact form and information.'
+            },
+            {
+                name: 'blog-post-1.html',
+                path: 'snippets/blog-post-1.html',
+                type: 'html',
+                area: 'Forest Library',
+                category: 'Blog',
+                color: 0x2ecc71,
+                description: 'First blog post about the beginning of the journey.'
+            },
+            {
+                name: 'blog-post-2.html',
+                path: 'snippets/blog-post-2.html',
+                type: 'html',
+                area: 'Forest Library',
+                category: 'Blog',
+                color: 0x2ecc71,
+                description: 'Second blog post with advanced topics.'
+            },
+            {
+                name: 'login.html',
+                path: 'snippets/login.html',
+                type: 'html',
+                area: 'Tech Sanctum',
+                category: 'Auth',
+                color: 0xe74c3c,
+                description: 'User login page with authentication form.'
+            },
+            {
+                name: 'dashboard.html',
+                path: 'snippets/dashboard.html',
+                type: 'html',
+                area: 'Tech Sanctum',
+                category: 'App',
+                color: 0xe74c3c,
+                description: 'User dashboard with data visualization and controls.'
+            },
+            {
+                name: 'gallery.html',
+                path: 'snippets/gallery.html',
+                type: 'html',
+                area: 'Knowledge Waterfalls',
+                category: 'Media',
+                color: 0x9b59b6,
+                description: 'Image gallery with photo showcase.'
+            },
+            {
+                name: 'video-player.html',
+                path: 'snippets/video-player.html',
+                type: 'html',
+                area: 'Knowledge Waterfalls',
+                category: 'Media',
+                color: 0x9b59b6,
+                description: 'Custom video player with playlist support.'
+            }
+        ];
+
+        // Create shared materials to reduce memory usage
+        const sharedMaterials = {
+            // Ground material
+            ground: new THREE.MeshStandardMaterial({
+                color: config.groundColor,
+                roughness: 0.8,
+                metalness: 0.1
+            }),
+            // Platform materials for each area
+            platforms: {},
+            // Basic materials for common objects
+            basic: {
+                white: new THREE.MeshStandardMaterial({ 
+                    color: 0xFFFFFF, 
+                    roughness: 0.7, 
+                    metalness: 0.1 
+                }),
+                dark: new THREE.MeshStandardMaterial({ 
+                    color: 0x333333, 
+                    roughness: 0.7, 
+                    metalness: 0.3 
+                }),
+                emissive: new THREE.MeshStandardMaterial({
+                    color: 0xFFFFFF,
+                    emissive: 0xFFFFFF,
+                    emissiveIntensity: 0.3
+                })
+            }
+        };
+
+        // Three.js variables
+        let scene, camera, renderer, controls;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3();
+        let raycaster, fileObjects = [], clock;
+        let selectedObject = null;
+        let miniMapContext, currentArea = null;
+        let lastMiniMapUpdate = 0;
+        let labelQuaternion = new THREE.Quaternion();
+
+        // DOM elements
+        const world = document.getElementById('world');
+        const sidebar = document.getElementById('sidebar');
+        const toggleSidebar = document.getElementById('toggle-sidebar');
+        const fileList = document.getElementById('file-list');
+        const locationList = document.getElementById('location-list');
+        const contentViewer = document.getElementById('content-viewer');
+        const viewerTitle = document.getElementById('viewer-title');
+        const contentFrame = document.getElementById('content-frame');
+        const closeViewer = document.getElementById('close-viewer');
+        const fileHoverInfo = document.getElementById('file-hover-info');
+        const areaNameElement = document.getElementById('area-name');
+        const crosshair = document.getElementById('crosshair');
+        const miniMap = document.getElementById('mini-map');
+        const miniMapCanvas = document.getElementById('mini-map-canvas');
+        const loadingBar = document.getElementById('loading-bar');
+
+        // Initialize the application
+        function init() {
+            // Check device capabilities and set appropriate quality
+            detectCapabilities();
+            
+            // Simulate loading progress
+            simulateLoading();
+
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0A0A18); // Deep blue-black
+
+            // Add fog for depth and mystery
+            scene.fog = new THREE.FogExp2(0x0A0A18, 0.015);
+
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = 2;  // Eye level
+
+            // Initialize renderer with appropriate settings
+            setupRenderer();
+
+            // Initialize raycaster for interaction
+            raycaster = new THREE.Raycaster();
+            clock = new THREE.Clock();
+
+            // Setup mini-map
+            setupMiniMap();
+
+            // Create platform materials for each area
+            setupSharedMaterials();
+
+            // Create the world in a performance-optimized way
+            createWorld();
+
+            // Position file objects in the world
+            createFileObjects();
+
+            // Populate sidebar
+            populateSidebar();
+
+            // Setup event listeners
+            setupEventListeners();
+
+            // Check if mobile device
+            detectMobileAndOptimize();
+            
+            // Start the animation loop
+            animate();
+        }
+
+        // Simulate loading for a more impressive start
+        function simulateLoading() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 8;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, 500);
+                }
+                loadingBar.style.width = progress + '%';
+            }, 200);
+        }
+        
+        // Detect device capabilities and set appropriate quality settings
+        function detectCapabilities() {
+            // Check for WebGL capabilities
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            
+            if (!gl) {
+                // WebGL not supported - use lowest settings
+                config.lowPolyMode = true;
+                config.shadowQuality = 'low';
+                config.objectDetail = 'low';
+                config.environmentDensity = 'low';
+                return;
+            }
+            
+            // Check for mobile device
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // Check if we're on a low-end device (approximation based on WebGL attributes)
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
+            const isLowEnd = isMobile || 
+                             renderer.includes('Intel') || 
+                             !gl.getExtension('OES_texture_float');
+            
+            // Set quality based on detected capabilities
+            if (isLowEnd) {
+                config.lowPolyMode = true;
+                config.shadowQuality = 'low';
+                config.objectDetail = 'low';
+                config.environmentDensity = 'low';
+                config.maxAnimationObjects = 30;
+                config.minMapUpdateInterval = 250; // Less frequent updates
+            } else if (isMobile) {
+                config.lowPolyMode = false;
+                config.shadowQuality = 'medium';
+                config.objectDetail = 'medium';
+                config.environmentDensity = 'low';
+                config.maxAnimationObjects = 50;
+                config.minMapUpdateInterval = 150;
+            }
+            
+            // Check available memory (rough estimation)
+            if (navigator.deviceMemory) {
+                if (navigator.deviceMemory <= 2) { // 2GB or less
+                    config.environmentDensity = 'low';
+                    config.maxAnimationObjects = Math.max(20, config.maxAnimationObjects);
+                }
+            }
+        }
+        
+        // Setup renderer with appropriate settings based on device capabilities
+        function setupRenderer() {
+            // Create renderer with antialiasing only if we're not in low-poly mode
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: !config.lowPolyMode,
+                powerPreference: 'high-performance'
+            });
+            
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Configure shadows based on quality setting
+            if (config.shadowQuality === 'low') {
+                renderer.shadowMap.enabled = false;
+            } else {
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = config.shadowQuality === 'high' 
+                    ? THREE.PCFSoftShadowMap 
+                    : THREE.BasicShadowMap;
+            }
+            
+            // Set pixel ratio based on device capability
+            const pixelRatio = window.devicePixelRatio || 1;
+            renderer.setPixelRatio(config.lowPolyMode ? Math.min(pixelRatio, 1) : pixelRatio);
+            
+            world.appendChild(renderer.domElement);
+        }
+        
+        // Setup shared materials for better performance
+        function setupSharedMaterials() {
+            // Create platform materials for each area
+            config.areas.forEach(area => {
+                sharedMaterials.platforms[area.name] = new THREE.MeshStandardMaterial({
+                    color: area.color,
+                    roughness: 0.7,
+                    metalness: 0.3,
+                    transparent: true,
+                    opacity: 0.9
+                });
+            });
+        }
+        
+        // Detect mobile and optimize accordingly
+        function detectMobileAndOptimize() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                setupMobileControls();
+                adaptUIForMobile();
+                optimizeForMobile();
+            }
+        }
+
+        // Setup mini-map
+        function setupMiniMap() {
+            miniMapContext = miniMapCanvas.getContext('2d');
+            miniMapCanvas.width = 200;
+            miniMapCanvas.height = 200;
+            updateMiniMap();
+        }
+
+        // Update mini-map with player position - optimized with throttling
+        function updateMiniMap() {
+            // Skip updates if not enough time has passed (throttling)
+            const now = performance.now();
+            if (now - lastMiniMapUpdate < config.minMapUpdateInterval && lastMiniMapUpdate !== 0) {
+                return;
+            }
+            lastMiniMapUpdate = now;
+            
+            const ctx = miniMapContext;
+            const size = miniMapCanvas.width;
+            const scale = size / config.worldSize;
+
+            // Clear the canvas
+            ctx.fillStyle = '#0A0A18';
+            ctx.fillRect(0, 0, size, size);
+
+            // Draw areas
+            config.areas.forEach(area => {
+                // Calculate position relative to canvas
+                const x = (area.position.x + config.worldSize / 2) * scale;
+                const z = (area.position.z + config.worldSize / 2) * scale;
+                const radius = area.radius * scale;
+
+                // Draw area
+                ctx.fillStyle = '#' + area.color.toString(16).padStart(6, '0');
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(x, z, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw area border
+                ctx.strokeStyle = '#' + area.color.toString(16).padStart(6, '0');
+                ctx.globalAlpha = 0.7;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x, z, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Only draw area names if not in low performance mode
+                if (config.objectDetail !== 'low') {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.globalAlpha = 0.7;
+                    ctx.font = '8px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(area.name, x, z);
+                }
+            });
+
+            // Draw file objects - limit the number for performance
+            const maxFiles = config.lowPolyMode ? 15 : 30;
+            const visibleFiles = filterVisibleObjects(fileObjects, maxFiles);
+            
+            visibleFiles.forEach(object => {
+                const x = (object.position.x + config.worldSize / 2) * scale;
+                const z = (object.position.z + config.worldSize / 2) * scale;
+
+                ctx.fillStyle = '#' + object.userData.color.toString(16).padStart(6, '0');
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                ctx.arc(x, z, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Draw player position
+            const playerX = (camera.position.x + config.worldSize / 2) * scale;
+            const playerZ = (camera.position.z + config.worldSize / 2) * scale;
+
+            // Draw player view direction
+            const viewDirX = Math.sin(camera.rotation.y) * 15;
+            const viewDirZ = Math.cos(camera.rotation.y) * 15;
+
+            ctx.strokeStyle = '#00B3FF';
+            ctx.globalAlpha = 0.7;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(playerX, playerZ);
+            ctx.lineTo(playerX - viewDirX * scale, playerZ - viewDirZ * scale);
+            ctx.stroke();
+
+            // Draw player position dot
+            ctx.fillStyle = '#00B3FF';
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(playerX, playerZ, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Add glow effect only if not in low performance mode
+            if (config.objectDetail !== 'low') {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#00B3FF';
+                ctx.beginPath();
+                ctx.arc(playerX, playerZ, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // Helper function to filter objects by distance to camera
+        function filterVisibleObjects(objects, maxCount) {
+            // Sort objects by distance to camera
+            const sorted = [...objects].sort((a, b) => {
+                const distA = camera.position.distanceToSquared(a.position);
+                const distB = camera.position.distanceToSquared(b.position);
+                return distA - distB;
+            });
+            
+            // Return closest objects up to maxCount
+            return sorted.slice(0, maxCount);
+        }
+
+        // Create the world environment - optimized for performance
+        function createWorld() {
+            // Create ground with appropriate detail level
+            let segments = 32; // Low detail default
+            if (config.objectDetail === 'medium') segments = 64;
+            else if (config.objectDetail === 'high') segments = 128;
+            
+            const groundGeometry = new THREE.PlaneGeometry(config.worldSize, config.worldSize, segments, segments);
+
+            // Create ground texture only if not in low-poly mode
+            let groundMaterial;
+            if (config.lowPolyMode) {
+                // Use simple material without texture for performance
+                groundMaterial = sharedMaterials.ground;
+            } else {
+                // Create texture only for medium and high quality
+                const groundTexture = createGroundTexture();
+                groundMaterial = new THREE.MeshStandardMaterial({
+                    color: config.groundColor,
+                    roughness: 0.8,
+                    metalness: 0.1,
+                    map: groundTexture,
+                    displacementScale: config.objectDetail === 'high' ? 2 : 1
+                });
+            }
+
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = config.shadowQuality !== 'low';
+            scene.add(ground);
+
+            // Add lights (before other objects for better performance)
+            addLights();
+
+            // Create distinct areas
+            createAreas();
+
+            // Based on environment density, add objects
+            if (config.environmentDensity !== 'low') {
+                // Add paths first (they're more important for navigation)
+                createPaths();
+                
+                // Add ambient environment objects
+                addEnvironmentObjects();
+                
+                // Create boundary - use simpler version for low-poly mode
+                createBoundary();
+            } else {
+                // For low density, just create simple boundary markers
+                createSimpleBoundary();
+            }
+
+            // Add sky - use simpler version for low-end devices
+            if (config.lowPolyMode) {
+                createSimpleSky();
+            } else {
+                createSky();
+            }
+        }
+        
+        // Create simplified sky for low-end devices
+        function createSimpleSky() {
+            // Just set a gradient background color
+            scene.background = new THREE.Color(0x0A0A18);
+            scene.fog.density = 0.02; // Increase fog to hide missing details
+        }
+
+        // Create a more interesting ground texture - optimized for performance
+        function createGroundTexture() {
+            // Adjust texture size based on quality settings
+            let textureSize = 512; // Default for low quality
+            if (config.objectDetail === 'high') textureSize = 1024;
+            else if (config.objectDetail === 'medium') textureSize = 768;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = textureSize;
+            canvas.height = textureSize;
+            const context = canvas.getContext('2d');
+
+            // Fill with base color
+            context.fillStyle = '#1a472a';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Add texture noise - reduced number of particles for better performance
+            const particleCount = config.objectDetail === 'high' ? 15000 : 5000;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 3 + 1;
+                const brightness = Math.random() * 0.2 - 0.1; // -0.1 to 0.1
+
+                context.fillStyle = brightness > 0
+                    ? `rgba(255, 255, 255, ${brightness})`
+                    : `rgba(0, 0, 0, ${-brightness})`;
+
+                context.beginPath();
+                context.arc(x, y, size, 0, Math.PI * 2);
+                context.fill();
+            }
+
+            // Add subtle patterns - reduced for performance
+            const patternCount = config.objectDetail === 'high' ? 20 : 10;
+            
+            for (let i = 0; i < patternCount; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const radius = Math.random() * 100 + 50;
+
+                const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
+                gradient.addColorStop(0, 'rgba(40, 140, 60, 0.2)');
+                gradient.addColorStop(1, 'rgba(26, 71, 42, 0)');
+
+                context.fillStyle = gradient;
+                context.beginPath();
+                context.arc(x, y, radius, 0, Math.PI * 2);
+                context.fill();
+            }
+
+            // Create texture with appropriate settings
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 4);
+            
+            // Set appropriate filtering
+            texture.minFilter = config.objectDetail === 'high' ? 
+                THREE.LinearMipMapLinearFilter : THREE.LinearFilter;
+            
+            return texture;
+        }
+        
+        // Create simplified boundary for low-end devices
+        function createSimpleBoundary() {
+            const wallSize = config.worldSize / 2 + 5;
+            const wallHeight = 20;
+
+            // Create invisible collision walls
+            const wallGeometry = new THREE.BoxGeometry(config.worldSize + 10, wallHeight, 1);
+            const wallMaterial = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 0 // Invisible walls
+            });
+
+            // Create a simple boundary using just 4 walls instead of detailed mountains
+            const walls = [
+                { position: [0, wallHeight / 2, -wallSize], rotation: [0, 0, 0] },   // North
+                { position: [0, wallHeight / 2, wallSize], rotation: [0, 0, 0] },    // South
+                { position: [wallSize, wallHeight / 2, 0], rotation: [0, Math.PI / 2, 0] }, // East
+                { position: [-wallSize, wallHeight / 2, 0], rotation: [0, Math.PI / 2, 0] } // West
+            ];
+            
+            walls.forEach(wall => {
+                const mesh = new THREE.Mesh(wallGeometry, wallMaterial);
+                mesh.position.set(...wall.position);
+                mesh.rotation.set(...wall.rotation);
+                scene.add(mesh);
+            });
+            
+            // Add simple visual markers at the corners
+            const cornerMarkerGeometry = new THREE.BoxGeometry(5, 30, 5);
+            const cornerMarkerMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            
+            const corners = [
+                [-wallSize, 0, -wallSize],
+                [wallSize, 0, -wallSize],
+                [wallSize, 0, wallSize],
+                [-wallSize, 0, wallSize]
+            ];
+            
+            // Add corner markers
+            corners.forEach(corner => {
+                const marker = new THREE.Mesh(cornerMarkerGeometry, cornerMarkerMaterial);
+                marker.position.set(...corner);
+                marker.castShadow = config.shadowQuality !== 'low';
+                scene.add(marker);
+            });
+        }
+
+        // Create sky dome - optimized for performance
+        function createSky() {
+            // Adjust sky detail based on quality settings
+            let segments = 16; // Default for low quality
+            if (config.objectDetail === 'high') segments = 32;
+            else if (config.objectDetail === 'medium') segments = 24;
+            
+            // Create a large sphere for the sky
+            const skyGeometry = new THREE.SphereGeometry(400, segments, segments);
+
+            // For a space-like sky with stars - simplified shader for performance
+            const skyMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    topColor: { value: new THREE.Color(0x000000) }, // Dark blue-black at top
+                    bottomColor: { value: new THREE.Color(0x101832) }, // Slightly lighter at bottom
+                    offset: { value: 50 },
+                    exponent: { value: 0.6 }
+                },
+                vertexShader: `
+                    varying vec3 vWorldPosition;
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 topColor;
+                    uniform vec3 bottomColor;
+                    uniform float offset;
+                    uniform float exponent;
+                    varying vec3 vWorldPosition;
+                    void main() {
+                        float h = normalize(vWorldPosition + offset).y;
+                        gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+                    }
+                `,
+                side: THREE.BackSide
+            });
+
+            const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+            scene.add(sky);
+
+            // Add stars to the sky - only if not in low-poly mode
+            if (!config.lowPolyMode) {
+                addStars();
+            }
+        }
+
+        // Add stars to the sky - optimized for performance
+        function addStars() {
+            // Adjust star count based on quality
+            let starCount = 2000; // Default for low quality
+            if (config.objectDetail === 'high') starCount = 10000;
+            else if (config.objectDetail === 'medium') starCount = 5000;
+            
+            const starGeometry = new THREE.BufferGeometry();
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xFFFFFF,
+                size: 0.7,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: config.objectDetail === 'high' // Only use size attenuation for high quality
+            });
+
+            const starVertices = [];
+            for (let i = 0; i < starCount; i++) {
+                const x = (Math.random() - 0.5) * 2000;
+                const y = Math.random() * 1000 + 50;
+                const z = (Math.random() - 0.5) * 2000;
+                starVertices.push(x, y, z);
+            }
+
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+        }
+        
+        // Add lights to the scene - optimized for performance
+        function addLights() {
+            // Ambient light for global illumination
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.4);
+            scene.add(ambientLight);
+
+            // Directional light for sun-like lighting - adjust based on shadow quality
+            const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.8);
+            directionalLight.position.set(50, 200, 100);
+            
+            if (config.shadowQuality !== 'low') {
+                directionalLight.castShadow = true;
+                
+                // Configure shadow properties based on quality
+                let shadowMapSize = 1024; // Default medium quality
+                if (config.shadowQuality === 'high') shadowMapSize = 2048;
+                
+                directionalLight.shadow.mapSize.width = shadowMapSize;
+                directionalLight.shadow.mapSize.height = shadowMapSize;
+                directionalLight.shadow.camera.near = 0.5;
+                directionalLight.shadow.camera.far = 500;
+                
+                // Set shadow camera extents
+                const d = 100;
+                directionalLight.shadow.camera.left = -d;
+                directionalLight.shadow.camera.right = d;
+                directionalLight.shadow.camera.top = d;
+                directionalLight.shadow.camera.bottom = -d;
+                
+                // For better performance on medium quality
+                if (config.shadowQuality === 'medium') {
+                    directionalLight.shadow.bias = -0.001;
+                }
+            }
+            
+            scene.add(directionalLight);
+
+            // Add area lights only if not in low performance mode
+            if (config.environmentDensity !== 'low') {
+                // Add colored point lights in different areas
+                config.areas.forEach(area => {
+                    const light = new THREE.PointLight(area.color, 1, 30);
+                    light.position.set(area.position.x, 10, area.position.z);
+                    
+                    if (config.shadowQuality !== 'low') {
+                        light.castShadow = true;
+                        light.shadow.mapSize.width = 512;
+                        light.shadow.mapSize.height = 512;
+                    }
+                    
+                    scene.add(light);
+                });
+            }
+        }
+
+        // Create distinct areas in the world - optimized for performance
+        function createAreas() {
+            // Create a single reusable platform geometry to save memory
+            // Adjust detail level based on quality settings
+            let segments = 16; // Low quality default
+            if (config.objectDetail === 'medium') segments = 24;
+            else if (config.objectDetail === 'high') segments = 32;
+            
+            // Store geometries to reuse them
+            const platformGeometries = {};
+            config.areas.forEach(area => {
+                // Create or reuse platform geometry
+                if (!platformGeometries[area.radius]) {
+                    platformGeometries[area.radius] = new THREE.CylinderGeometry(area.radius, area.radius, 0.5, segments);
+                }
+                
+                // Get appropriate material from shared materials
+                const platformMaterial = sharedMaterials.platforms[area.name];
+                
+                const platform = new THREE.Mesh(platformGeometries[area.radius], platformMaterial);
+                platform.position.set(area.position.x, 0.25, area.position.z);
+                platform.receiveShadow = config.shadowQuality !== 'low';
+                scene.add(platform);
+
+                // Create central monument or identifier for each area
+                if (config.objectDetail !== 'low') {
+                    createAreaMonument(area);
+                } else {
+                    // For low detail, just create a simple monument marker
+                    createSimpleAreaMarker(area);
+                }
+
+                // Add decorative elements around the platform if not in low density mode
+                if (config.environmentDensity !== 'low') {
+                    createAreaDecorations(area);
+                }
+
+                // Add area name floating text - optimized for all devices
+                createAreaLabel(area);
+            });
+        }
+        
+        // Create a simplified area marker for low detail mode
+        function createSimpleAreaMarker(area) {
+            // Create a simple landmark for the area that's distinctive but low-poly
+            const markerGeometry = new THREE.CylinderGeometry(1, 2, 10, 6);
+            const markerMaterial = new THREE.MeshStandardMaterial({
+                color: area.color,
+                roughness: 0.5,
+                metalness: 0.5
+            });
+            
+            const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+            marker.position.set(area.position.x, 5, area.position.z);
+            marker.castShadow = config.shadowQuality !== 'low';
+            scene.add(marker);
+            
+            // Add a simple distinctive element on top of the marker
+            let topElement;
+            
+            switch(area.name) {
+                case "Central Hub":
+                    // Simple sphere for central hub
+                    topElement = new THREE.Mesh(
+                        new THREE.SphereGeometry(2, 8, 8),
+                        new THREE.MeshStandardMaterial({
+                            color: area.color,
+                            emissive: area.color,
+                            emissiveIntensity: 0.3
+                        })
+                    );
+                    break;
+                
+                case "Forest Library":
+                    // Simple cone for forest
+                    topElement = new THREE.Mesh(
+                        new THREE.ConeGeometry(2, 4, 6),
+                        new THREE.MeshStandardMaterial({
+                            color: area.color
+                        })
+                    );
+                    break;
+                
+                case "Tech Sanctum":
+                    // Simple box for tech
+                    topElement = new THREE.Mesh(
+                        new THREE.BoxGeometry(3, 3, 3),
+                        new THREE.MeshStandardMaterial({
+                            color: area.color,
+                            metalness: 0.8
+                        })
+                    );
+                    break;
+                
+                case "Knowledge Waterfalls":
+                    // Simple torus for waterfalls
+                    topElement = new THREE.Mesh(
+                        new THREE.TorusGeometry(2, 0.5, 8, 12),
+                        new THREE.MeshStandardMaterial({
+                            color: area.color
+                        })
+                    );
+                    break;
+            }
+            
+            if (topElement) {
+                topElement.position.y = 11;
+                marker.add(topElement);
+            }
+        }
+
+        // Create a distinctive monument for each area
+        function createAreaMonument(area) {
+            let monument;
+
+            switch (area.name) {
+                case "Central Hub":
+                    // Create a central tower
+                    const towerGeometry = new THREE.CylinderGeometry(2, 3, 20, 8);
+                    const towerMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x3498db,
+                        roughness: 0.5,
+                        metalness: 0.7
+                    });
+                    monument = new THREE.Mesh(towerGeometry, towerMaterial);
+
+                    // Add glowing elements to the tower
+                    const ringGeometry = new THREE.TorusGeometry(4, 0.5, 16, 32);
+                    const ringMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x3498db,
+                        emissive: 0x3498db,
+                        emissiveIntensity: 0.5,
+                        roughness: 0.3,
+                        metalness: 0.8
+                    });
+
+                    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                    ring.rotation.x = Math.PI / 2;
+                    ring.position.y = 12;
+                    monument.add(ring);
+
+                    // Add floating animation to the ring
+                    animateObject(ring, { floatHeight: 1, floatSpeed: 0.5, rotationSpeed: 0.5 });
+                    break;
+
+                case "Forest Library":
+                    // Create a tree-like structure with books
+                    const trunkGeometry = new THREE.CylinderGeometry(1.5, 2, 10, 8);
+                    const trunkMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x8B4513,
+                        roughness: 0.9,
+                        metalness: 0.1
+                    });
+                    monument = new THREE.Mesh(trunkGeometry, trunkMaterial);
+
+                    // Add foliage made of books
+                    for (let i = 0; i < 5; i++) {
+                        const y = 6 + i * 1.5;
+                        const radius = 5 - i * 0.7;
+                        const leafLayer = createBookLayer(radius, 0.4, 0x2ecc71, y);
+                        monument.add(leafLayer);
+                    }
+                    break;
+
+                case "Tech Sanctum":
+                    // Create a futuristic structure
+                    const baseGeometry = new THREE.BoxGeometry(5, 1, 5);
+                    const baseMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x333333,
+                        roughness: 0.2,
+                        metalness: 0.9
+                    });
+                    monument = new THREE.Mesh(baseGeometry, baseMaterial);
+
+                    // Add holographic pillar
+                    const pillarGeometry = new THREE.CylinderGeometry(0.5, 0.5, 12, 16);
+                    const pillarMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xe74c3c,
+                        emissive: 0xe74c3c,
+                        emissiveIntensity: 0.5,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+
+                    const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+                    pillar.position.y = 6.5;
+                    monument.add(pillar);
+
+                    // Add orbiting elements
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (i / 3) * Math.PI * 2;
+                        const orbitRadius = 3;
+
+                        const x = Math.cos(angle) * orbitRadius;
+                        const z = Math.sin(angle) * orbitRadius;
+
+                        const sphereGeometry = new THREE.SphereGeometry(0.7, 16, 16);
+                        const sphereMaterial = new THREE.MeshStandardMaterial({
+                            color: 0xe74c3c,
+                            emissive: 0xe74c3c,
+                            emissiveIntensity: 0.3
+                        });
+
+                        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                        sphere.position.set(x, 6 + i * 1.5, z);
+
+                        monument.add(sphere);
+
+                        // Add orbiting animation
+                        animateOrbiting(sphere, { centerY: 6 + i * 1.5, radius: orbitRadius, speed: 0.5 + i * 0.2 });
+                    }
+                    break;
+
+                case "Knowledge Waterfalls":
+                    // Create a waterfall structure
+                    const baseGeo = new THREE.CylinderGeometry(3, 4, 2, 16);
+                    const baseMat = new THREE.MeshStandardMaterial({
+                        color: 0x555555,
+                        roughness: 0.7,
+                        metalness: 0.3
+                    });
+                    monument = new THREE.Mesh(baseGeo, baseMat);
+
+                    // Add central column
+                    const columnGeometry = new THREE.CylinderGeometry(0.8, 0.8, 12, 16);
+                    const columnMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x888888,
+                        roughness: 0.4,
+                        metalness: 0.6
+                    });
+
+                    const column = new THREE.Mesh(columnGeometry, columnMaterial);
+                    column.position.y = 7;
+                    monument.add(column);
+
+                    // Add flowing water effect
+                    const waterGeometry = new THREE.CylinderGeometry(2.5, 0, 10, 16, 10, true);
+                    const waterMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x9b59b6,
+                        emissive: 0x9b59b6,
+                        emissiveIntensity: 0.3,
+                        transparent: true,
+                        opacity: 0.7,
+                        side: THREE.DoubleSide
+                    });
+
+                    const water = new THREE.Mesh(waterGeometry, waterMaterial);
+                    water.position.y = 6;
+                    monument.add(water);
+
+                    // Animate the water flow
+                    water.userData.animation = {
+                        time: 0,
+                        flowSpeed: 2
+                    };
+                    break;
+            }
+
+            if (monument) {
+                monument.position.set(area.position.x, 0.5, area.position.z);
+                monument.castShadow = true;
+                monument.receiveShadow = true;
+                scene.add(monument);
+            }
+        }
+
+        // Create a layer of books for the Forest Library
+        function createBookLayer(radius, height, color, y) {
+            const group = new THREE.Group();
+            const bookCount = Math.floor(radius * 5);
+
+            for (let i = 0; i < bookCount; i++) {
+                const angle = (i / bookCount) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                // Randomize book dimensions slightly
+                const width = 0.4 + Math.random() * 0.3;
+                const bookHeight = 1.2 + Math.random() * 0.4;
+                const depth = 0.2 + Math.random() * 0.1;
+
+                // Randomize book color
+                const bookColor = new THREE.Color(color).offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+
+                const bookGeometry = new THREE.BoxGeometry(width, bookHeight, depth);
+                const bookMaterial = new THREE.MeshStandardMaterial({
+                    color: bookColor,
+                    roughness: 0.7,
+                    metalness: 0.1
+                });
+
+                const book = new THREE.Mesh(bookGeometry, bookMaterial);
+
+                // Position and rotate the book
+                book.position.set(x, y, z);
+                book.rotation.y = angle + Math.PI / 2;
+                book.rotation.z = Math.random() * 0.2 - 0.1;
+
+                book.castShadow = true;
+                group.add(book);
+            }
+
+            return group;
+        }
+
+        // Create decorations around each area
+        function createAreaDecorations(area) {
+            // Add area-specific decorations
+            switch (area.name) {
+                case "Central Hub":
+                    // Add lamp posts around the hub
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2;
+                        const radius = area.radius - 1;
+
+                        const x = Math.cos(angle) * radius + area.position.x;
+                        const z = Math.sin(angle) * radius + area.position.z;
+
+                        createLampPost(x, 0, z, 0x3498db);
+                    }
+                    break;
+
+                case "Forest Library":
+                    // Add small trees and mushrooms
+                    for (let i = 0; i < 12; i++) {
+                        const angle = (i / 12) * Math.PI * 2;
+                        const radius = area.radius * (0.7 + Math.random() * 0.3);
+
+                        const x = Math.cos(angle) * radius + area.position.x;
+                        const z = Math.sin(angle) * radius + area.position.z;
+
+                        if (i % 3 === 0) {
+                            createSmallTree(x, 0, z);
+                        } else {
+                            createMushroom(x, 0, z);
+                        }
+                    }
+                    break;
+
+                case "Tech Sanctum":
+                    // Add techno-panels and lights
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2;
+                        const radius = area.radius - 1;
+
+                        const x = Math.cos(angle) * radius + area.position.x;
+                        const z = Math.sin(angle) * radius + area.position.z;
+
+                        createTechPanel(x, 0, z);
+                    }
+                    break;
+
+                case "Knowledge Waterfalls":
+                    // Add crystal formations
+                    for (let i = 0; i < 7; i++) {
+                        const angle = (i / 7) * Math.PI * 2;
+                        const radius = area.radius * (0.6 + Math.random() * 0.3);
+
+                        const x = Math.cos(angle) * radius + area.position.x;
+                        const z = Math.sin(angle) * radius + area.position.z;
+
+                        createCrystal(x, 0, z, 0x9b59b6);
+                    }
+                    break;
+            }
+        }
+
+        // Create a floating label for each area - optimized for performance
+        function createAreaLabel(area) {
+            // Adjust canvas size based on quality settings - smaller for better performance
+            let canvasWidth = 256;
+            let canvasHeight = 64;
+            
+            if (config.objectDetail === 'high') {
+                canvasWidth = 512;
+                canvasHeight = 128;
+            } else if (config.objectDetail === 'medium') {
+                canvasWidth = 384;
+                canvasHeight = 96;
+            }
+            
+            // Create a canvas for the texture
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+
+            // Set background 
+            context.fillStyle = 'rgba(10, 10, 24, 0.7)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Add border
+            context.strokeStyle = '#' + area.color.toString(16).padStart(6, '0');
+            context.lineWidth = 4;
+            context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+
+            // Configure text - font size adjusts with canvas size
+            const fontSize = Math.round(canvasHeight * 0.375); // Roughly equivalent to 48px on a 128px height
+            context.font = `bold ${fontSize}px Arial`;
+            context.fillStyle = '#' + area.color.toString(16).padStart(6, '0');
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(area.name, canvas.width / 2, canvas.height / 2);
+
+            // Create texture with optimized settings
+            const texture = new THREE.CanvasTexture(canvas);
+            
+            // Only use mipmaps for high quality
+            if (config.objectDetail !== 'high') {
+                texture.minFilter = THREE.LinearFilter;
+            }
+            
+            // Use shared material to reduce memory usage
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                side: THREE.DoubleSide,
+                transparent: true,
+                alphaTest: 0.1 // Helps with transparency sorting
+            });
+
+            // Create plane with the texture
+            const geometry = new THREE.PlaneGeometry(10, 2.5);
+            const plane = new THREE.Mesh(geometry, material);
+
+            // Position above the area
+            plane.position.set(area.position.x, 15, area.position.z);
+
+            // Store camera-facing flag and original quaternion
+            plane.userData = { 
+                type: 'label',
+                facingCamera: true
+            };
+            
+            // Only add animation if not in low performance mode
+            if (config.objectDetail !== 'low') {
+                animateFloating(plane, 0);
+            }
+
+            scene.add(plane);
+        }
+
+        // Create a lamp post
+        function createLampPost(x, y, z, color = 0xFFFF00) {
+            // Post
+            const postGeometry = new THREE.CylinderGeometry(0.2, 0.3, 4, 8);
+            const postMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.8,
+                metalness: 0.5
+            });
+            const post = new THREE.Mesh(postGeometry, postMaterial);
+            post.position.set(x, y + 2, z);
+            post.castShadow = true;
+            post.receiveShadow = true;
+            scene.add(post);
+
+            // Light housing
+            const housingGeometry = new THREE.CylinderGeometry(0.5, 0.7, 0.4, 8);
+            const housingMaterial = new THREE.MeshStandardMaterial({
+                color: 0x555555,
+                roughness: 0.5,
+                metalness: 0.7
+            });
+            const housing = new THREE.Mesh(housingGeometry, housingMaterial);
+            housing.position.set(x, y + 4.2, z);
+            housing.castShadow = true;
+            scene.add(housing);
+
+            // Light source
+            const lightGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+            const lightMaterial = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.8,
+                transparent: true,
+                opacity: 0.9
+            });
+            const light = new THREE.Mesh(lightGeometry, lightMaterial);
+            light.position.set(x, y + 4.2, z);
+            scene.add(light);
+
+            // Add pulsing animation to the light
+            animatePulsing(light);
+
+            // Add actual light
+            const pointLight = new THREE.PointLight(color, 1, 15);
+            pointLight.position.set(x, y + 4.2, z);
+            pointLight.castShadow = true;
+            pointLight.shadow.mapSize.width = 512;
+            pointLight.shadow.mapSize.height = 512;
+            scene.add(pointLight);
+
+            // Link the point light to the mesh for animation
+            light.userData.pointLight = pointLight;
+        }
+
+        // Create a small tree for the Forest Library
+        function createSmallTree(x, y, z) {
+            // Trunk
+            const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 3, 8);
+            const trunkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x8B4513,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.set(x, y + 1.5, z);
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            scene.add(trunk);
+
+            // Leaves (several layers of cones)
+            for (let i = 0; i < 3; i++) {
+                const height = 1.5 - i * 0.3;
+                const radius = 1.2 - i * 0.2;
+                const yOffset = 2.5 + i * 1;
+
+                const leavesGeometry = new THREE.ConeGeometry(radius, height, 8);
+                const leavesMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2ecc71,
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.set(x, y + yOffset, z);
+                leaves.castShadow = true;
+                leaves.receiveShadow = true;
+                scene.add(leaves);
+            }
+        }
+
+        // Create a mushroom for the Forest Library
+        function createMushroom(x, y, z) {
+            // Stem
+            const stemGeometry = new THREE.CylinderGeometry(0.2, 0.3, 1, 8);
+            const stemMaterial = new THREE.MeshStandardMaterial({
+                color: 0xEEEEEE,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+            stem.position.set(x, y + 0.5, z);
+            stem.castShadow = true;
+            stem.receiveShadow = true;
+            scene.add(stem);
+
+            // Cap
+            const capGeometry = new THREE.SphereGeometry(0.7, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const capMaterial = new THREE.MeshStandardMaterial({
+                color: Math.random() > 0.5 ? 0xe74c3c : 0x3498db,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const cap = new THREE.Mesh(capGeometry, capMaterial);
+            cap.position.set(x, y + 1, z);
+            cap.castShadow = true;
+            cap.receiveShadow = true;
+            scene.add(cap);
+
+            // Add spots to the cap
+            for (let i = 0; i < 6; i++) {
+                const spotGeometry = new THREE.CircleGeometry(0.1, 8);
+                const spotMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+                const spot = new THREE.Mesh(spotGeometry, spotMaterial);
+
+                // Position spots on the cap
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 0.4;
+                const spotX = x + Math.cos(angle) * radius;
+                const spotZ = z + Math.sin(angle) * radius;
+
+                spot.position.set(spotX, y + 1.1, spotZ);
+                spot.rotation.x = -Math.PI / 2;
+                scene.add(spot);
+            }
+        }
+
+        // Create a tech panel for the Tech Sanctum
+        function createTechPanel(x, y, z) {
+            // Panel base
+            const baseGeometry = new THREE.BoxGeometry(1.5, 3, 0.2);
+            const baseMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.2,
+                metalness: 0.9
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.set(x, y + 1.5, z);
+            base.castShadow = true;
+            base.receiveShadow = true;
+
+            // Random rotation to face different directions
+            base.rotation.y = Math.random() * Math.PI * 2;
+
+            scene.add(base);
+
+            // Screen/display
+            const screenGeometry = new THREE.PlaneGeometry(1.2, 1.5);
+            const screenMaterial = new THREE.MeshBasicMaterial({
+                color: 0xe74c3c,
+                emissive: 0xe74c3c,
+                emissiveIntensity: 0.5
+            });
+            const screen = new THREE.Mesh(screenGeometry, screenMaterial);
+            screen.position.set(0, 0.5, 0.11);
+            base.add(screen);
+
+            // Add blinking animation
+            animateBlinking(screen);
+
+            // Add buttons
+            for (let i = 0; i < 3; i++) {
+                const buttonGeometry = new THREE.CircleGeometry(0.1, 16);
+                const buttonMaterial = new THREE.MeshBasicMaterial({
+                    color: i === 0 ? 0x2ecc71 : i === 1 ? 0xf39c12 : 0x3498db
+                });
+                const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+                button.position.set(-0.4 + i * 0.4, -0.8, 0.11);
+                base.add(button);
+            }
+        }
+
+        // Create a crystal for the Knowledge Waterfalls
+        function createCrystal(x, y, z, color) {
+            // Create a crystal-like geometry (custom geometry)
+            const crystalGroup = new THREE.Group();
+
+            // Create multiple shards
+            const shardCount = 5 + Math.floor(Math.random() * 3);
+
+            for (let i = 0; i < shardCount; i++) {
+                // Parameters for this shard
+                const height = 1 + Math.random() * 3;
+                const width = 0.2 + Math.random() * 0.4;
+                const angle = (i / shardCount) * Math.PI * 2;
+                const distance = 0.1 + Math.random() * 0.2;
+
+                // Create vertices for a crystal shard
+                const shardGeometry = new THREE.ConeGeometry(width, height, 4);
+
+                // Randomize the crystal color slightly
+                const shardColor = new THREE.Color(color).offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+
+                const shardMaterial = new THREE.MeshStandardMaterial({
+                    color: shardColor,
+                    emissive: shardColor,
+                    emissiveIntensity: 0.2,
+                    transparent: true,
+                    opacity: 0.8,
+                    roughness: 0.2,
+                    metalness: 0.8
+                });
+
+                const shard = new THREE.Mesh(shardGeometry, shardMaterial);
+
+                // Position and rotate the shard
+                shard.position.set(
+                    Math.cos(angle) * distance,
+                    height / 2,
+                    Math.sin(angle) * distance
+                );
+
+                // Tilt the shard slightly outward
+                shard.rotation.x = (Math.random() - 0.5) * 0.2;
+                shard.rotation.z = (Math.random() - 0.5) * 0.2;
+
+                crystalGroup.add(shard);
+            }
+
+            crystalGroup.position.set(x, y, z);
+            crystalGroup.castShadow = true;
+            crystalGroup.receiveShadow = true;
+
+            // Add pulsing glow animation
+            animatePulsing(crystalGroup, { speed: 0.5, intensity: 0.4 });
+
+            scene.add(crystalGroup);
+
+            // Add light
+            const pointLight = new THREE.PointLight(color, 0.5, 5);
+            pointLight.position.set(x, y + 1.5, z);
+            scene.add(pointLight);
+        }
+
+        // Add environment objects like trees, rocks, and ambient elements - optimized for performance
+        function addEnvironmentObjects() {
+            // Adjust density based on configuration
+            const treeDensity = config.environmentDensity === 'high' ? 50 : config.environmentDensity === 'medium' ? 30 : 15;
+            const rockDensity = config.environmentDensity === 'high' ? 40 : config.environmentDensity === 'medium' ? 25 : 10;
+            const smallElementDensity = config.environmentDensity === 'high' ? 200 : config.environmentDensity === 'medium' ? 100 : 40;
+            
+            // Create a reusable function to check if position is too close to any area
+            function isTooCloseToArea(x, z, minDistance) {
+                for (const area of config.areas) {
+                    const distSq = Math.pow(x - area.position.x, 2) + Math.pow(z - area.position.z, 2);
+                    if (distSq < Math.pow(area.radius + minDistance, 2)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            // Precompute world boundaries for better performance
+            const worldBoundary = config.worldSize * 0.9 / 2;
+            
+            // Create shared geometries to reduce memory usage
+            const sharedGeometries = {
+                // Only create geometries if they'll be used
+                rockGeometry: new THREE.DodecahedronGeometry(1.0, 0),
+                flowerStem: new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8),
+                flowerCenter: new THREE.SphereGeometry(0.1, 8, 8),
+                grassBlade: new THREE.PlaneGeometry(0.05, 0.7),
+                mushroomStem: new THREE.CylinderGeometry(0.04, 0.05, 0.2, 8),
+                mushroomCap: new THREE.SphereGeometry(0.12, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2)
+            };
+            
+            // Shared materials to reduce memory usage
+            const sharedMaterials = {
+                rockMaterial: new THREE.MeshStandardMaterial({
+                    color: 0x888888,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    flatShading: true
+                }),
+                stemMaterial: new THREE.MeshStandardMaterial({
+                    color: 0x3CB371,
+                    roughness: 0.8,
+                    metalness: 0.1
+                }),
+                flowerCenterMaterial: new THREE.MeshStandardMaterial({
+                    color: 0xFFD700,
+                    roughness: 0.6,
+                    metalness: 0.2
+                }),
+                mushroomStemMaterial: new THREE.MeshStandardMaterial({
+                    color: 0xEEEEEE,
+                    roughness: 0.7,
+                    metalness: 0.1
+                })
+            };
+            
+            // Group all small objects in a single parent for better scene management
+            const smallElementsParent = new THREE.Group();
+            scene.add(smallElementsParent);
+            
+            // Add trees throughout the world - create in batches for better performance
+            for (let i = 0; i < treeDensity; i++) {
+                const x = (Math.random() - 0.5) * config.worldSize * 0.9;
+                const z = (Math.random() - 0.5) * config.worldSize * 0.9;
+
+                if (!isTooCloseToArea(x, z, 5)) {
+                    createTree(x, 0, z, Math.random() * 1.5 + 0.7);
+                }
+            }
+
+            // Add rocks - use instancing for better performance if there are many
+            if (rockDensity >= 20 && !config.lowPolyMode) {
+                createInstancedRocks(rockDensity, worldBoundary, sharedGeometries.rockGeometry, isTooCloseToArea);
+            } else {
+                // Traditional method for fewer rocks or low-poly mode
+                for (let i = 0; i < rockDensity; i++) {
+                    const x = (Math.random() - 0.5) * config.worldSize * 0.9;
+                    const z = (Math.random() - 0.5) * config.worldSize * 0.9;
+                    
+                    if (!isTooCloseToArea(x, z, 3)) {
+                        createRock(x, 0, z, sharedGeometries.rockGeometry, sharedMaterials.rockMaterial);
+                    }
+                }
+            }
+
+            // Add small ambient elements with instancing for better performance
+            if (smallElementDensity > 0) {
+                // For low-detail mode, use instanced rendering for small elements
+                if (config.objectDetail === 'low') {
+                    createInstancedSmallElements(smallElementDensity, worldBoundary, sharedGeometries, sharedMaterials, isTooCloseToArea);
+                } else {
+                    // Traditional method for medium/high detail
+                    for (let i = 0; i < smallElementDensity; i++) {
+                        const x = (Math.random() - 0.5) * config.worldSize * 0.9;
+                        const z = (Math.random() - 0.5) * config.worldSize * 0.9;
+                        
+                        if (!isTooCloseToArea(x, z, 1)) {
+                            // Randomly choose ambient element type
+                            const elementType = Math.floor(Math.random() * 3);
+                            
+                            switch (elementType) {
+                                case 0:
+                                    createFlower(x, 0, z, sharedGeometries, sharedMaterials);
+                                    break;
+                                case 1:
+                                    createGrassTuft(x, 0, z, sharedGeometries, sharedMaterials);
+                                    break;
+                                case 2:
+                                    createSmallMushroom(x, 0, z, sharedGeometries, sharedMaterials);
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Create instanced rocks for better performance
+        function createInstancedRocks(count, worldBoundary, rockGeometry, isTooCloseToArea) {
+            // Create instanced mesh for rocks
+            const instancedRockGeometry = rockGeometry.clone();
+            const rockMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                roughness: 0.9,
+                metalness: 0.1,
+                flatShading: true
+            });
+            
+            const instancedRock = new THREE.InstancedMesh(
+                instancedRockGeometry, 
+                rockMaterial,
+                count
+            );
+            instancedRock.castShadow = true;
+            instancedRock.receiveShadow = true;
+            
+            // Matrix for positioning and scaling
+            const matrix = new THREE.Matrix4();
+            const positions = [];
+            
+            // Generate valid positions
+            let validCount = 0;
+            let attempts = 0;
+            const maxAttempts = count * 3; // Limit attempts to avoid infinite loop
+            
+            while (validCount < count && attempts < maxAttempts) {
+                const x = (Math.random() - 0.5) * config.worldSize * 0.9;
+                const z = (Math.random() - 0.5) * config.worldSize * 0.9;
+                attempts++;
+                
+                if (!isTooCloseToArea(x, z, 3)) {
+                    positions.push({ x, z });
+                    validCount++;
+                }
+            }
+            
+            // Set instance matrices
+            for (let i = 0; i < validCount; i++) {
+                const position = positions[i];
+                
+                // Random rock size
+                const scale = 0.5 + Math.random() * 1.5;
+                
+                // Random rotation
+                const rotX = Math.random() * Math.PI;
+                const rotY = Math.random() * Math.PI;
+                const rotZ = Math.random() * Math.PI;
+                
+                // Set matrix for this instance
+                matrix.makeRotationX(rotX);
+                matrix.makeRotationY(rotY);
+                matrix.makeRotationZ(rotZ);
+                matrix.scale(new THREE.Vector3(scale, scale, scale));
+                matrix.setPosition(position.x, scale/2, position.z);
+                
+                instancedRock.setMatrixAt(i, matrix);
+                
+                // Randomize color slightly
+                if (i % 10 === 0) { // Only update color occasionally to save CPU
+                    const color = new THREE.Color(0x888888);
+                    color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+                    instancedRock.setColorAt(i, color);
+                }
+            }
+            
+            // Need to manually update for matrices to take effect
+            instancedRock.instanceMatrix.needsUpdate = true;
+            if (instancedRock.instanceColor) instancedRock.instanceColor.needsUpdate = true;
+            
+            scene.add(instancedRock);
+        }
+        
+        // Create instanced small elements (flowers, grass, mushrooms) for better performance
+        function createInstancedSmallElements(count, worldBoundary, geometries, materials, isTooCloseToArea) {
+            // Base geometry for simple elements - use simpler geometry for better performance
+            const elementGeometry = new THREE.BoxGeometry(0.2, 0.5, 0.2);
+            
+            // Create instanced mesh
+            const instancedElements = new THREE.InstancedMesh(
+                elementGeometry,
+                materials.stemMaterial.clone(),
+                count
+            );
+            instancedElements.castShadow = false; // Don't cast shadows for better performance
+            instancedElements.receiveShadow = true;
+            
+            // Matrix for positioning
+            const matrix = new THREE.Matrix4();
+            let instanceIndex = 0;
+            
+            // Generate elements
+            for (let i = 0; i < count; i++) {
+                const x = (Math.random() - 0.5) * config.worldSize * 0.9;
+                const z = (Math.random() - 0.5) * config.worldSize * 0.9;
+                
+                if (!isTooCloseToArea(x, z, 1)) {
+                    // Randomly choose element type for color variation
+                    const elementType = Math.floor(Math.random() * 3);
+                    const height = 0.3 + Math.random() * 0.4;
+                    const scale = 0.7 + Math.random() * 0.6;
+                    
+                    // Set matrix for this instance
+                    matrix.makeScale(scale, height, scale);
+                    matrix.setPosition(x, height/2, z);
+                    
+                    instancedElements.setMatrixAt(instanceIndex, matrix);
+                    
+                    // Set color based on element type
+                    let color;
+                    switch (elementType) {
+                        case 0: // Flower
+                            color = new THREE.Color(Math.random() > 0.5 ? 0xFF6B6B : 0x48DBFB);
+                            break;
+                        case 1: // Grass
+                            color = new THREE.Color(0x3CB371);
+                            color.offsetHSL(0, Math.random() * 0.2, (Math.random() - 0.5) * 0.2);
+                            break;
+                        case 2: // Mushroom
+                            color = new THREE.Color(Math.random() > 0.5 ? 0xA52A2A : 0xFFFFFF);
+                            break;
+                    }
+                    
+                    instancedElements.setColorAt(instanceIndex, color);
+                    instanceIndex++;
+                    
+                    if (instanceIndex >= count) break;
+                }
+            }
+            
+            // Need to manually update
+            instancedElements.instanceMatrix.needsUpdate = true;
+            if (instancedElements.instanceColor) instancedElements.instanceColor.needsUpdate = true;
+            
+            scene.add(instancedElements);
+        }
+
+        // Create a tree with adjustable scale
+        function createTree(x, y, z, scale = 1) {
+            const treeGroup = new THREE.Group();
+            treeGroup.position.set(x, y, z);
+
+            // Create trunk
+            const trunkGeometry = new THREE.CylinderGeometry(0.4 * scale, 0.6 * scale, 5 * scale, 8);
+            const trunkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x8B4513,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.y = 2.5 * scale;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            treeGroup.add(trunk);
+
+            // Create leaves (in layers for more detailed appearance)
+            const leafColors = [0x2E8B57, 0x3CB371, 0x228B22]; // Different green shades
+
+            for (let i = 0; i < 3; i++) {
+                const y = (4 + i * 1.5) * scale;
+                const size = (4 - i * 0.7) * scale;
+
+                const leavesGeometry = new THREE.SphereGeometry(size, 8, 8);
+                const leavesMaterial = new THREE.MeshStandardMaterial({
+                    color: leafColors[i % leafColors.length],
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.y = y;
+                leaves.castShadow = true;
+                leaves.receiveShadow = true;
+                treeGroup.add(leaves);
+            }
+
+            scene.add(treeGroup);
+        }
+
+        // Create a rock - optimized version with shared geometry and material
+        function createRock(x, y, z, sharedGeometry, sharedMaterial) {
+            // Use provided shared geometry or create a new one if not provided
+            const geometry = sharedGeometry || new THREE.DodecahedronGeometry(
+                0.5 + Math.random() * 1.5, // radius
+                0   // no extra detail
+            );
+            
+            // Clone the geometry if we need to distort it (to avoid affecting shared geometry)
+            let rockGeometry = geometry;
+            
+            // For medium/high detail, distort the geometry for more unique rocks
+            if (config.objectDetail !== 'low') {
+                rockGeometry = geometry.clone();
+                const positions = rockGeometry.attributes.position;
+                
+                // Apply random distortion to vertices
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const y = positions.getY(i);
+                    const z = positions.getZ(i);
+                    
+                    // Apply a small random offset to each vertex
+                    positions.setX(i, x + (Math.random() - 0.5) * 0.2);
+                    positions.setY(i, y + (Math.random() - 0.5) * 0.2);
+                    positions.setZ(i, z + (Math.random() - 0.5) * 0.2);
+                }
+                
+                rockGeometry.computeVertexNormals(); // Important after modifying the geometry
+            }
+            
+            // Use provided shared material or create a new one
+            let material;
+            if (sharedMaterial) {
+                // Clone the material to customize the color
+                material = sharedMaterial.clone();
+                material.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+            } else {
+                // Create material with a stone-like appearance
+                material = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(0x888888).offsetHSL(0, 0, (Math.random() - 0.5) * 0.2),
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    flatShading: true
+                });
+            }
+            
+            const rock = new THREE.Mesh(rockGeometry, material);
+            
+            // Random rotation
+            rock.rotation.x = Math.random() * Math.PI;
+            rock.rotation.y = Math.random() * Math.PI;
+            rock.rotation.z = Math.random() * Math.PI;
+            
+            // Get the size for correct positioning
+            const radius = rockGeometry.parameters ? rockGeometry.parameters.radius : 1.0;
+            rock.position.set(x, y + radius / 2, z);
+            
+            // Enable shadows only if quality settings allow it
+            rock.castShadow = config.shadowQuality !== 'low';
+            rock.receiveShadow = config.shadowQuality !== 'low';
+            
+            // Add to scene
+            scene.add(rock);
+            
+            return rock;
+        }
+
+        // Create a flower - optimized with shared geometries and materials
+        function createFlower(x, y, z, sharedGeometries, sharedMaterials) {
+            // Create flower group
+            const flowerGroup = new THREE.Group();
+            flowerGroup.position.set(x, y, z);
+            
+            // Use shared geometries and materials if provided, otherwise create new ones
+            
+            // Stem
+            const stemGeometry = sharedGeometries?.flowerStem || new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8);
+            const stemMaterial = sharedMaterials?.stemMaterial || new THREE.MeshStandardMaterial({
+                color: 0x3CB371,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            
+            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+            stem.position.y = 0.35;
+            flowerGroup.add(stem);
+            
+            // Flower center
+            const centerGeometry = sharedGeometries?.flowerCenter || new THREE.SphereGeometry(0.1, 8, 8);
+            const centerMaterial = sharedMaterials?.flowerCenterMaterial || new THREE.MeshStandardMaterial({
+                color: 0xFFD700,
+                roughness: 0.6,
+                metalness: 0.2
+            });
+            
+            const center = new THREE.Mesh(centerGeometry, centerMaterial);
+            center.position.y = 0.7;
+            flowerGroup.add(center);
+            
+            // Optimize the number of petals based on device capability
+            const petalCount = config.objectDetail === 'low' ? 4 : 6;
+            
+            // Flower petals - use a simple shared geometry
+            // Simplify petal geometry for low-end devices
+            const petalGeometry = new THREE.ConeGeometry(0.08, 0.2, config.objectDetail === 'low' ? 4 : 8);
+            
+            // Flower petal colors - use a smaller palette for better memory usage
+            const petalColors = [0xFF6B6B, 0x48DBFB, 0xFECA57, 0xFF9FF3, 0x1DD1A1];
+            const petalColor = petalColors[Math.floor(Math.random() * petalColors.length)];
+            
+            // Create a single shared material for all petals of this flower
+            const petalMaterial = new THREE.MeshStandardMaterial({
+                color: petalColor,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            
+            // Create petals
+            for (let i = 0; i < petalCount; i++) {
+                const angle = (i / petalCount) * Math.PI * 2;
+                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                
+                // Position petal around center
+                petal.position.set(
+                    Math.cos(angle) * 0.15,
+                    0.7,
+                    Math.sin(angle) * 0.15
+                );
+                
+                // Rotate petal to point outward
+                petal.rotation.x = Math.PI / 2;
+                petal.rotation.y = -angle;
+                
+                flowerGroup.add(petal);
+            }
+            
+            // Add to scene
+            scene.add(flowerGroup);
+            
+            // Add subtle swaying animation only if not in low performance mode
+            if (config.environmentDensity !== 'low') {
+                animateSwaying(flowerGroup);
+            }
+            
+            return flowerGroup;
+        }
+
+        // Create a grass tuft
+        function createGrassTuft(x, y, z) {
+            const grassGroup = new THREE.Group();
+            grassGroup.position.set(x, y, z);
+
+            // Create several blades
+            for (let i = 0; i < 7; i++) {
+                const height = 0.3 + Math.random() * 0.4;
+                const width = 0.03 + Math.random() * 0.02;
+
+                const bladeGeometry = new THREE.PlaneGeometry(width, height);
+                const bladeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x3CB371,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
+                });
+
+                // Vary the color slightly
+                bladeMaterial.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+
+                const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+
+                // Position and rotate each blade
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 0.05;
+
+                blade.position.set(
+                    Math.cos(angle) * radius,
+                    height / 2,
+                    Math.sin(angle) * radius
+                );
+
+                blade.rotation.y = angle;
+                blade.rotation.x = -Math.PI / 8 + Math.random() * (Math.PI / 12);
+
+                grassGroup.add(blade);
+            }
+
+            scene.add(grassGroup);
+
+            // Add subtle swaying animation
+            animateSwaying(grassGroup);
+        }
+
+        // Create a small mushroom
+        function createSmallMushroom(x, y, z) {
+            const mushroomGroup = new THREE.Group();
+            mushroomGroup.position.set(x, y, z);
+
+            // Stem
+            const stemGeometry = new THREE.CylinderGeometry(0.04, 0.05, 0.2, 8);
+            const stemMaterial = new THREE.MeshStandardMaterial({
+                color: 0xEEEEEE,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+            stem.position.y = 0.1;
+            mushroomGroup.add(stem);
+
+            // Cap
+            const capGeometry = new THREE.SphereGeometry(0.12, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+
+            // Randomize color between red, brown, and white
+            const colors = [0xA52A2A, 0xCD853F, 0xFFFFFF];
+            const capColor = colors[Math.floor(Math.random() * colors.length)];
+
+            const capMaterial = new THREE.MeshStandardMaterial({
+                color: capColor,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const cap = new THREE.Mesh(capGeometry, capMaterial);
+            cap.position.y = 0.2;
+            cap.rotation.x = Math.PI;
+            mushroomGroup.add(cap);
+
+            scene.add(mushroomGroup);
+        }
+
+        // Create paths between areas
+        function createPaths() {
+            const pathMaterial = new THREE.MeshStandardMaterial({
+                color: 0xBDB76B,
+                roughness: 1,
+                metalness: 0
+            });
+
+            // Create paths between all areas
+            for (let i = 0; i < config.areas.length; i++) {
+                for (let j = i + 1; j < config.areas.length; j++) {
+                    const area1 = config.areas[i];
+                    const area2 = config.areas[j];
+
+                    createPathBetweenAreas(area1, area2, pathMaterial);
+                }
+            }
+        }
+
+        // Create a path between two areas
+        function createPathBetweenAreas(area1, area2, material) {
+            // Calculate distance and direction
+            const dx = area2.position.x - area1.position.x;
+            const dz = area2.position.z - area1.position.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+
+            // Create path segments with some randomness for a natural look
+            const segmentCount = Math.ceil(distance / 5);
+            let currentX = area1.position.x;
+            let currentZ = area1.position.z;
+
+            const targetX = area2.position.x;
+            const targetZ = area2.position.z;
+
+            for (let i = 0; i < segmentCount; i++) {
+                // Calculate progress and next point with some randomness
+                const t = (i + 1) / segmentCount;
+                const randomOffset = (i > 0 && i < segmentCount - 1) ? (Math.random() - 0.5) * 5 : 0;
+
+                const nextX = area1.position.x + dx * t + randomOffset * Math.sin(t * Math.PI);
+                const nextZ = area1.position.z + dz * t + randomOffset * Math.cos(t * Math.PI);
+
+                // Create path segment
+                createPathSegment(currentX, currentZ, nextX, nextZ, material);
+
+                currentX = nextX;
+                currentZ = nextZ;
+            }
+        }
+
+        // Create a single path segment
+        function createPathSegment(x1, z1, x2, z2, material) {
+            const dx = x2 - x1;
+            const dz = z2 - z1;
+            const length = Math.sqrt(dx * dx + dz * dz);
+            const angle = Math.atan2(dz, dx);
+
+            const pathGeometry = new THREE.PlaneGeometry(length, 2);
+            const path = new THREE.Mesh(pathGeometry, material);
+
+            path.rotation.x = -Math.PI / 2;
+            path.rotation.z = -angle;
+
+            path.position.set((x1 + x2) / 2, 0.01, (z1 + z2) / 2);
+            path.receiveShadow = true;
+
+            scene.add(path);
+
+            // Add some decorations along the path
+            addPathDecorations(x1, z1, x2, z2, length);
+        }
+
+        // Add decorations along a path
+        function addPathDecorations(x1, z1, x2, z2, length) {
+            const count = Math.floor(length / 3);
+            const dx = x2 - x1;
+            const dz = z2 - z1;
+
+            for (let i = 1; i < count; i++) {
+                const t = i / count;
+                const x = x1 + dx * t;
+                const z = z1 + dz * t;
+
+                // Add decorations on alternating sides of the path
+                const side = i % 2 === 0 ? 1 : -1;
+                const perpX = -dz;
+                const perpZ = dx;
+                const norm = Math.sqrt(perpX * perpX + perpZ * perpZ);
+
+                const decorX = x + (perpX / norm) * side * 1.5;
+                const decorZ = z + (perpZ / norm) * side * 1.5;
+
+                // Randomly choose decoration type
+                const decorType = Math.floor(Math.random() * 3);
+
+                switch (decorType) {
+                    case 0:
+                        createSmallRock(decorX, 0, decorZ);
+                        break;
+                    case 1:
+                        createGrassTuft(decorX, 0, decorZ);
+                        break;
+                    case 2:
+                        createFlower(decorX, 0, decorZ);
+                        break;
+                }
+            }
+        }
+
+        // Create a small decorative rock
+        function createSmallRock(x, y, z) {
+            const rockGeometry = new THREE.DodecahedronGeometry(0.3 + Math.random() * 0.3, 0);
+            const rockMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                roughness: 0.9,
+                metalness: 0.1,
+                flatShading: true
+            });
+
+            // Randomize the color
+            rockMaterial.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+
+            const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+            rock.position.set(x, y + 0.15, z);
+
+            // Random rotation
+            rock.rotation.x = Math.random() * Math.PI;
+            rock.rotation.y = Math.random() * Math.PI;
+            rock.rotation.z = Math.random() * Math.PI;
+
+            rock.castShadow = true;
+            rock.receiveShadow = true;
+            scene.add(rock);
+        }
+
+        // Create boundary
+        function createBoundary() {
+            const wallSize = config.worldSize / 2 + 5;
+            const wallHeight = 20;
+
+            // Create invisible collision walls
+            const wallGeometry = new THREE.BoxGeometry(config.worldSize + 10, wallHeight, 1);
+            const wallMaterial = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 0 // Invisible walls
+            });
+
+            // North wall
+            const northWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            northWall.position.set(0, wallHeight / 2, -wallSize);
+            scene.add(northWall);
+
+            // South wall
+            const southWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            southWall.position.set(0, wallHeight / 2, wallSize);
+            scene.add(southWall);
+
+            // East wall
+            const eastWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            eastWall.rotation.y = Math.PI / 2;
+            eastWall.position.set(wallSize, wallHeight / 2, 0);
+            scene.add(eastWall);
+
+            // West wall
+            const westWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            westWall.rotation.y = Math.PI / 2;
+            westWall.position.set(-wallSize, wallHeight / 2, 0);
+            scene.add(westWall);
+
+            // Create a visual boundary (mountain range or cliffs)
+            createVisualBoundary();
+        }
+
+        // Create visual boundary
+        function createVisualBoundary() {
+            const segments = 60;
+            const radius = config.worldSize / 2 + 10;
+
+            for (let i = 0; i < segments; i++) {
+                const angle = (i / segments) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                // Create mountain or cliff
+                createMountain(x, 0, z, angle);
+            }
+        }
+
+        // Create a mountain for visual boundary
+        function createMountain(x, y, z, angle) {
+            // Create a mountain with multiple peaks
+            const mountainGroup = new THREE.Group();
+            mountainGroup.position.set(x, y, z);
+
+            // Rotate to face inward
+            mountainGroup.rotation.y = angle + Math.PI;
+
+            // Create main peak
+            const height = 30 + Math.random() * 20;
+            const width = 10 + Math.random() * 5;
+
+            const mountainGeometry = new THREE.ConeGeometry(width, height, 5);
+            const mountainMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4B5320,
+                roughness: 0.9,
+                metalness: 0.1,
+                flatShading: true
+            });
+
+            const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+            mountain.position.y = height / 2;
+            mountain.castShadow = true;
+            mountainGroup.add(mountain);
+
+            // Add some smaller peaks
+            for (let i = 0; i < 3; i++) {
+                const smallHeight = height * (0.5 + Math.random() * 0.3);
+                const smallWidth = width * (0.6 + Math.random() * 0.3);
+
+                const smallGeometry = new THREE.ConeGeometry(smallWidth, smallHeight, 5);
+                const smallMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4B5320,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    flatShading: true
+                });
+
+                // Slightly vary the color
+                smallMaterial.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
+
+                const smallPeak = new THREE.Mesh(smallGeometry, smallMaterial);
+
+                // Position around the main peak
+                const peakAngle = Math.random() * Math.PI * 2;
+                const peakDist = width * 0.7;
+                smallPeak.position.set(
+                    Math.cos(peakAngle) * peakDist,
+                    smallHeight / 2,
+                    Math.sin(peakAngle) * peakDist
+                );
+
+                smallPeak.castShadow = true;
+                mountainGroup.add(smallPeak);
+            }
+
+            scene.add(mountainGroup);
+        }
+
+        // Add lights to the scene
+        function addLights() {
+            // Ambient light for global illumination
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.4);
+            scene.add(ambientLight);
+
+            // Directional light for sun-like lighting
+            const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.8);
+            directionalLight.position.set(50, 200, 100);
+            directionalLight.castShadow = true;
+
+            // Configure shadow properties
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+
+            // Set shadow camera extents
+            const d = 100;
+            directionalLight.shadow.camera.left = -d;
+            directionalLight.shadow.camera.right = d;
+            directionalLight.shadow.camera.top = d;
+            directionalLight.shadow.camera.bottom = -d;
+
+            scene.add(directionalLight);
+
+            // Add some colored point lights in different areas
+            config.areas.forEach(area => {
+                const light = new THREE.PointLight(area.color, 1, 30);
+                light.position.set(area.position.x, 10, area.position.z);
+                light.castShadow = true;
+                scene.add(light);
+            });
+        }
+
+        // Create 3D objects for each file
+        function createFileObjects() {
+            // Group files by area
+            const filesByArea = {};
+            config.areas.forEach(area => {
+                filesByArea[area.name] = [];
+            });
+
+            // Organize files by area
+            files.forEach(file => {
+                if (filesByArea[file.area]) {
+                    filesByArea[file.area].push(file);
+                } else {
+                    // Default to Central Hub if area not found
+                    filesByArea["Central Hub"].push(file);
+                }
+            });
+
+            // Create file objects for each area
+            Object.keys(filesByArea).forEach(areaName => {
+                const areaFiles = filesByArea[areaName];
+                const area = config.areas.find(a => a.name === areaName);
+
+                if (area && areaFiles.length > 0) {
+                    // Calculate arrangement in a circle or other pattern
+                    const totalFiles = areaFiles.length;
+                    const radius = Math.min(area.radius * 0.7, totalFiles * 0.8);
+
+                    areaFiles.forEach((file, index) => {
+                        // Calculate position in a circle within the area
+                        const angle = (index / totalFiles) * Math.PI * 2;
+                        const x = area.position.x + Math.sin(angle) * radius;
+                        const z = area.position.z + Math.cos(angle) * radius;
+
+                        createFileObject(file, x, z);
+                    });
+                }
+            });
+        }
+
+        // Create a single file object
+        function createFileObject(file, x, z) {
+            // Create a custom object based on file type and category
+            let object;
+
+            // Base size for file objects
+            const size = config.objectBaseSize;
+
+            // Create geometry based on file type
+            let geometry;
+            if (file.type === 'html') {
+                // For HTML files, create 3D document-like objects
+                geometry = new THREE.BoxGeometry(size * 1.2, size * 1.5, size * 0.3);
+            } else {
+                // Default shape
+                geometry = new THREE.BoxGeometry(size, size, size);
+            }
+
+            // Create material based on file color and category
+            const material = new THREE.MeshStandardMaterial({
+                color: file.color,
+                roughness: 0.5,
+                metalness: 0.3,
+                emissive: file.color,
+                emissiveIntensity: 0.2
+            });
+
+            object = new THREE.Mesh(geometry, material);
+            object.position.set(x, size + 0.5, z); // Position above the ground
+            object.castShadow = true;
+            object.receiveShadow = true;
+
+            // Store file data with the object
+            object.userData = {
+                name: file.name,
+                path: file.path,
+                type: file.type,
+                color: file.color,
+                category: file.category,
+                description: file.description
+            };
+
+            // Add 3D icon or emblem based on file type
+            addFileTypeIndicator(object, file);
+
+            // Add file name above the object
+            addFileLabel(file, x, size * 2 + 0.5, z);
+
+            // Add to scene and file objects array
+            scene.add(object);
+            fileObjects.push(object);
+
+            // Create a floating animation
+            animateFloating(object, Math.random() * 2);
+        }
+
+        // Add a visual indicator of file type to the file object
+        function addFileTypeIndicator(fileObject, file) {
+            let indicator;
+
+            switch (file.type) {
+                case 'html':
+                    // Add HTML tag symbol
+                    const tagGeometry = new THREE.TorusGeometry(0.3, 0.05, 16, 24);
+                    const tagMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xFFFFFF,
+                        emissive: 0xFFFFFF,
+                        emissiveIntensity: 0.5
+                    });
+                    indicator = new THREE.Mesh(tagGeometry, tagMaterial);
+
+                    // Add diagonal line inside the circle
+                    const lineGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.7, 8);
+                    const lineMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xFFFFFF,
+                        emissive: 0xFFFFFF,
+                        emissiveIntensity: 0.5
+                    });
+                    const line = new THREE.Mesh(lineGeometry, lineMaterial);
+                    line.rotation.z = Math.PI / 4;
+                    indicator.add(line);
+
+                    break;
+
+                default:
+                    // Default document icon
+                    const docGeometry = new THREE.BoxGeometry(0.4, 0.5, 0.05);
+                    const docMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xFFFFFF,
+                        emissive: 0xFFFFFF,
+                        emissiveIntensity: 0.3
+                    });
+                    indicator = new THREE.Mesh(docGeometry, docMaterial);
+
+                    // Add lines to represent text
+                    for (let i = 0; i < 3; i++) {
+                        const lineGeo = new THREE.BoxGeometry(0.3, 0.02, 0.06);
+                        const lineMat = new THREE.MeshBasicMaterial({ color: file.color });
+                        const textLine = new THREE.Mesh(lineGeo, lineMat);
+                        textLine.position.y = 0.1 - i * 0.1;
+                        indicator.add(textLine);
+                    }
+
+                    break;
+            }
+
+            if (indicator) {
+                // Position on the front face of the file object
+                const boundingBox = new THREE.Box3().setFromObject(fileObject);
+                const depth = boundingBox.max.z - boundingBox.min.z;
+
+                indicator.position.set(0, 0, depth / 2 + 0.05);
+                fileObject.add(indicator);
+            }
+        }
+
+        // Add text label for a file
+        function addFileLabel(file, x, y, z) {
+            // Create a canvas for the texture
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 128;
+
+            // Set background (semi-transparent)
+            context.fillStyle = 'rgba(10, 10, 24, 0.7)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Add border
+            context.strokeStyle = '#' + file.color.toString(16).padStart(6, '0');
+            context.lineWidth = 3;
+            context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+
+            // Configure text
+            context.font = 'bold 32px Arial';
+            context.fillStyle = '#FFFFFF';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(file.name, canvas.width / 2, canvas.height / 2 - 10);
+
+            // Add category
+            context.font = '18px Arial';
+            context.fillStyle = '#' + file.color.toString(16).padStart(6, '0');
+            context.fillText(file.category, canvas.width / 2, canvas.height / 2 + 20);
+
+            // Create texture and material
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+
+            // Create plane with the texture
+            const geometry = new THREE.PlaneGeometry(2.5, 0.6);
+            const plane = new THREE.Mesh(geometry, material);
+
+            // Position above the file object
+            plane.position.set(x, y, z);
+
+            // Make the label always face the camera
+            plane.userData = { type: 'label' };
+
+            scene.add(plane);
+        }
+
+        // Animation functions
+        // -------------------
+
+        // Animate floating objects
+        function animateFloating(object, delay = 0) {
+            // Starting position
+            const startY = object.position.y;
+
+            // Store animation data in userData
+            object.userData.animation = {
+                type: 'floating',
+                startY: startY,
+                time: delay,
+                floatHeight: 0.3,
+                floatSpeed: 1
+            };
+        }
+
+        // Animate orbiting objects
+        function animateOrbiting(object, options = {}) {
+            const defaults = {
+                centerX: 0,
+                centerY: 0,
+                centerZ: 0,
+                radius: 3,
+                speed: 1,
+                startAngle: Math.random() * Math.PI * 2
+            };
+
+            const settings = { ...defaults, ...options };
+
+            // Store animation data
+            object.userData.animation = {
+                type: 'orbiting',
+                centerX: settings.centerX !== undefined ? settings.centerX : object.position.x,
+                centerY: settings.centerY !== undefined ? settings.centerY : object.position.y,
+                centerZ: settings.centerZ !== undefined ? settings.centerZ : object.position.z,
+                radius: settings.radius,
+                speed: settings.speed,
+                angle: settings.startAngle,
+                time: 0
+            };
+        }
+
+        // Animate pulsing objects
+        function animatePulsing(object, options = {}) {
+            const defaults = {
+                minScale: 0.8,
+                maxScale: 1.2,
+                speed: 1,
+                intensity: 0.5
+            };
+
+            const settings = { ...defaults, ...options };
+
+            // Store original scale
+            const originalScale = object.scale.clone();
+
+            // Store animation data
+            object.userData.animation = {
+                type: 'pulsing',
+                originalScale: originalScale,
+                minScale: settings.minScale,
+                maxScale: settings.maxScale,
+                speed: settings.speed,
+                intensity: settings.intensity,
+                time: Math.random() * Math.PI * 2
+            };
+        }
+
+        // Animate blinking objects
+        function animateBlinking(object, options = {}) {
+            const defaults = {
+                minIntensity: 0.2,
+                maxIntensity: 1,
+                speed: 2,
+                pattern: 'random' // or 'regular'
+            };
+
+            const settings = { ...defaults, ...options };
+
+            // Store original emission
+            const originalEmissive = object.material.emissive ?
+                object.material.emissiveIntensity : 0;
+
+            // Store animation data
+            object.userData.animation = {
+                type: 'blinking',
+                originalEmissive: originalEmissive,
+                minIntensity: settings.minIntensity,
+                maxIntensity: settings.maxIntensity,
+                speed: settings.speed,
+                pattern: settings.pattern,
+                time: Math.random() * Math.PI * 2,
+                lastBlink: 0,
+                nextBlink: Math.random() * 2
+            };
+        }
+
+        // Animate swaying objects
+        function animateSwaying(object, options = {}) {
+            const defaults = {
+                maxAngle: 0.1,
+                speed: 1
+            };
+
+            const settings = { ...defaults, ...options };
+
+            // Store original rotation
+            const originalRotation = {
+                x: object.rotation.x,
+                y: object.rotation.y,
+                z: object.rotation.z
+            };
+
+            // Store animation data
+            object.userData.animation = {
+                type: 'swaying',
+                originalRotation: originalRotation,
+                maxAngle: settings.maxAngle,
+                speed: settings.speed,
+                time: Math.random() * Math.PI * 2
+            };
+        }
+
+        // Animated object
+        function animateObject(object, options = {}) {
+            const defaults = {
+                floatHeight: 0.3,
+                floatSpeed: 1,
+                rotationSpeed: 0.2
+            };
+
+            const settings = { ...defaults, ...options };
+
+            // Starting position
+            const startY = object.position.y;
+
+            // Store animation data in userData
+            object.userData.animation = {
+                type: 'complex',
+                startY: startY,
+                time: Math.random() * Math.PI * 2,
+                floatHeight: settings.floatHeight,
+                floatSpeed: settings.floatSpeed,
+                rotationSpeed: settings.rotationSpeed
+            };
+        }
+
+        // Populate the sidebar with file list
+        function populateSidebar() {
+            // Clear lists
+            fileList.innerHTML = '';
+            locationList.innerHTML = '';
+
+            // Populate locations
+            config.areas.forEach(area => {
+                const locationItem = document.createElement('div');
+                locationItem.className = 'file-item';
+                locationItem.innerHTML = `
+            <div class="file-icon">📍</div>
+            <div class="file-name">${area.name}</div>
+        `;
+
+                // Teleport to area when clicked
+                locationItem.addEventListener('click', () => {
+                    // Position slightly outside the area center to avoid being inside objects
+                    camera.position.set(
+                        area.position.x + 5,
+                        2,
+                        area.position.z + 5
+                    );
+
+                    // Look toward the area center
+                    camera.lookAt(area.position.x, 2, area.position.z);
+
+                    // Close sidebar after teleporting
+                    sidebar.classList.remove('open');
+                    config.sidebarOpen = false;
+
+                    // Show area name
+                    showAreaName(area.name);
+                });
+
+                locationList.appendChild(locationItem);
+            });
+
+            // Group files by category
+            const categories = {};
+            files.forEach(file => {
+                if (!categories[file.category]) {
+                    categories[file.category] = [];
+                }
+
+                categories[file.category].push(file);
+            });
+
+            // Create category sections
+            Object.keys(categories).sort().forEach(category => {
+                // Create category label
+                const categoryLabel = document.createElement('div');
+                categoryLabel.className = 'section-title';
+                categoryLabel.textContent = category;
+                fileList.appendChild(categoryLabel);
+
+                // Add files in this category
+                categories[category].forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                <div class="file-icon">📄</div>
+                <div class="file-name">${file.name}</div>
+                <div class="file-category">${file.area}</div>
+            `;
+
+                    // Open file when clicked in sidebar
+                    fileItem.addEventListener('click', () => {
+                        openFile(file.path, file.name, file);
+                        fileItem.classList.add('active');
+                    });
+
+                    fileList.appendChild(fileItem);
+                });
+            });
+        }
+
+        // Show area name when entering a new area
+        function showAreaName(name) {
+            areaNameElement.textContent = name;
+            areaNameElement.classList.add('visible');
+
+            // Hide after a few seconds
+            setTimeout(() => {
+                areaNameElement.classList.remove('visible');
+            }, 5000);
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Window resize handling
+            window.addEventListener('resize', onWindowResize);
+
+            // Mouse click for file selection
+            renderer.domElement.addEventListener('click', onMouseClick);
+
+            // Keyboard controls for movement
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+
+            // Mouse movement for camera rotation
+            document.addEventListener('mousemove', onMouseMove);
+
+            // Pointer lock for camera control
+            renderer.domElement.addEventListener('click', () => {
+                renderer.domElement.requestPointerLock();
+            });
+
+            // Toggle sidebar
+            toggleSidebar.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+                config.sidebarOpen = sidebar.classList.contains('open');
+            });
+
+            // Close viewer
+            closeViewer.addEventListener('click', () => {
+                contentViewer.style.display = 'none';
+                contentFrame.src = 'about:blank';
+
+                // Remove active class from file items
+                const activeItems = document.querySelectorAll('.file-item.active');
+                activeItems.forEach(item => item.classList.remove('active'));
+            });
+
+            // Check for URL hash to open file
+            if (window.location.hash) {
+                const fileName = window.location.hash.substring(1);
+                const file = files.find(f => f.name === fileName);
+                if (file) {
+                    openFile(file.path, file.name, file);
+                }
+            }
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Handle mouse movement for camera rotation
+        function onMouseMove(event) {
+            if (document.pointerLockElement === renderer.domElement) {
+                // Camera rotation
+                camera.rotation.y -= event.movementX * config.lookSpeed;
+
+                // Limit vertical rotation
+                const verticalLook = camera.rotation.x - event.movementY * config.lookSpeed;
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, verticalLook));
+            }
+
+            // Raycast to check for file objects under cursor
+            checkFileObjectsUnderCursor();
+        }
+
+        // Handle mouse click for file selection
+        function onMouseClick() {
+            if (selectedObject) {
+                openFile(selectedObject.userData.path, selectedObject.userData.name, selectedObject.userData);
+
+                // Show selection effect
+                crosshair.classList.add('active');
+                setTimeout(() => {
+                    crosshair.classList.remove('active');
+                }, 300);
+            }
+        }
+
+        // Open file in the content viewer
+        function openFile(path, name, fileData) {
+            viewerTitle.textContent = name;
+            contentFrame.src = path;
+            contentViewer.style.display = 'block';
+
+            // Update URL hash for bookmarking
+            window.location.hash = name;
+
+            // Update active file in sidebar
+            const fileItems = document.querySelectorAll('.file-item');
+            fileItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.querySelector('.file-name').textContent === name) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        // Check if file objects are under the cursor
+        function checkFileObjectsUnderCursor() {
+            // Center of the screen
+            const mouse = new THREE.Vector2(0, 0);
+
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+
+            // Calculate objects intersecting the ray
+            const intersects = raycaster.intersectObjects(fileObjects);
+
+            // Reset previous hover state
+            if (selectedObject && (!intersects.length || selectedObject !== intersects[0].object)) {
+                // Reset scale and emissive
+                selectedObject.scale.set(1, 1, 1);
+                if (selectedObject.material.emissive) {
+                    selectedObject.material.emissiveIntensity = 0.2;
+                }
+
+                // Hide hover info
+                fileHoverInfo.style.display = 'none';
+
+                // Reset crosshair
+                crosshair.classList.remove('active');
+
+                selectedObject = null;
+            }
+
+            // Set new hover state
+            if (intersects.length > 0) {
+                selectedObject = intersects[0].object;
+
+                // Highlight effect
+                selectedObject.scale.set(1.1, 1.1, 1.1);
+                if (selectedObject.material.emissive) {
+                    selectedObject.material.emissiveIntensity = 0.5;
+                }
+
+                // Show crosshair as active
+                crosshair.classList.add('active');
+
+                // Show file info
+                if (selectedObject.userData) {
+                    fileHoverInfo.innerHTML = `
+                <div class="file-hover-name">${selectedObject.userData.name}</div>
+                <div class="file-hover-desc">${selectedObject.userData.description || ''}</div>
+            `;
+                    fileHoverInfo.style.display = 'block';
+                }
+            }
+        }
+
+        // Handle keyboard input for movement
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyW':
+                case 'ArrowUp':
+                    moveForward = true;
+                    break;
+                case 'KeyS':
+                case 'ArrowDown':
+                    moveBackward = true;
+                    break;
+                case 'KeyA':
+                case 'ArrowLeft':
+                    moveLeft = true;
+                    break;
+                case 'KeyD':
+                case 'ArrowRight':
+                    moveRight = true;
+                    break;
+                case 'KeyE':
+                    // Toggle sidebar with E key
+                    sidebar.classList.toggle('open');
+                    config.sidebarOpen = sidebar.classList.contains('open');
+                    break;
+                case 'KeyQ':
+                    // Toggle mini-map with Q key
+                    config.miniMapVisible = !config.miniMapVisible;
+                    miniMap.style.display = config.miniMapVisible ? 'block' : 'none';
+                    break;
+                case 'Escape':
+                    // Close content viewer with Escape
+                    if (contentViewer.style.display === 'block') {
+                        contentViewer.style.display = 'none';
+                        contentFrame.src = 'about:blank';
+
+                        // Remove active class from file items
+                        const activeItems = document.querySelectorAll('.file-item.active');
+                        activeItems.forEach(item => item.classList.remove('active'));
+                    }
+                    break;
+                case 'Space':
+                    // Jump or special action
+                    break;
+            }
+        }
+
+        // Handle key release
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'KeyW':
+                case 'ArrowUp':
+                    moveForward = false;
+                    break;
+                case 'KeyS':
+                case 'ArrowDown':
+                    moveBackward = false;
+                    break;
+                case 'KeyA':
+                case 'ArrowLeft':
+                    moveLeft = false;
+                    break;
+                case 'KeyD':
+                case 'ArrowRight':
+                    moveRight = false;
+                    break;
+            }
+        }
+
+        // Animation loop - optimized for performance
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            const currentTime = performance.now();
+            
+            // Update character movement
+            updateMovement(delta);
+            
+            // Update animations with throttling based on distance
+            updateAnimations(delta, currentTime);
+            
+            // Make labels face the camera - already throttled internally
+            updateLabels();
+            
+            // Check for area change
+            checkAreaChange();
+            
+            // Update mini-map with throttling - already throttled internally
+            if (config.miniMapVisible) {
+                updateMiniMap();
+            }
+            
+            // Render scene
+            renderer.render(scene, camera);
+            
+            // IMPORTANT: Free any temporary objects to help garbage collection
+            // This helps prevent stuttering due to GC pauses
+            if (tempVector) tempVector.set(0, 0, 0);
+        }
+        
+        // Reusable temporary objects to avoid garbage collection
+        const tempVector = new THREE.Vector3();
+        const tempMatrix = new THREE.Matrix4();
+        const tempQuat = new THREE.Quaternion();
+
+        // Update character movement
+        function updateMovement(delta) {
+            velocity.x = 0;
+            velocity.z = 0;
+
+            // Calculate forward/backward velocity
+            if (moveForward) {
+                velocity.z -= config.movementSpeed * delta * 10 * config.currentMovementScale;
+            }
+            if (moveBackward) {
+                velocity.z += config.movementSpeed * delta * 10 * config.currentMovementScale;
+            }
+
+            // Calculate left/right velocity
+            if (moveLeft) {
+                velocity.x -= config.movementSpeed * delta * 10 * config.currentMovementScale;
+            }
+            if (moveRight) {
+                velocity.x += config.movementSpeed * delta * 10 * config.currentMovementScale;
+            }
+
+            // Convert velocity to local camera direction
+            const direction = new THREE.Vector3(velocity.x, 0, velocity.z);
+            direction.applyQuaternion(camera.quaternion);
+
+            // Update camera position
+            camera.position.add(direction);
+
+            // Maintain y position (ground level + eye height)
+            camera.position.y = 2;
+
+            // Boundary check to prevent walking outside the world
+            const boundarySize = config.worldSize / 2 - 1;
+            camera.position.x = Math.max(-boundarySize, Math.min(boundarySize, camera.position.x));
+            camera.position.z = Math.max(-boundarySize, Math.min(boundarySize, camera.position.z));
+        }
+
+        // Update animations - optimized with distance-based throttling and object culling
+        function updateAnimations(delta, currentTime) {
+            // Define animation culling distance - objects further than this get simple or no animation
+            const fullAnimDistance = config.objectDetail === 'high' ? 70 : 
+                                    config.objectDetail === 'medium' ? 50 : 30;
+            const simpleAnimDistance = fullAnimDistance * 1.5;
+            
+            // Limit animation updates to a maximum number per frame
+            const maxAnimationsPerFrame = config.maxAnimationObjects;
+            let animationCount = 0;
+            
+            // Find all animatable objects and sort by distance to camera
+            const animatableObjects = [];
+            
+            scene.traverse(object => {
+                if (object.userData && object.userData.animation) {
+                    // Calculate distance to camera (squared, for performance)
+                    const distSq = camera.position.distanceToSquared(object.position);
+                    
+                    // Only consider objects within the animation range
+                    if (distSq < simpleAnimDistance * simpleAnimDistance) {
+                        animatableObjects.push({
+                            object: object,
+                            distSq: distSq
+                        });
+                    }
+                }
+            });
+            
+            // Sort objects by distance (closest first)
+            animatableObjects.sort((a, b) => a.distSq - b.distSq);
+            
+            // Process animations for closest objects first, up to the limit
+            const processedObjects = Math.min(animatableObjects.length, maxAnimationsPerFrame);
+            
+            for (let i = 0; i < processedObjects; i++) {
+                const entry = animatableObjects[i];
+                const object = entry.object;
+                const animation = object.userData.animation;
+                const distSq = entry.distSq;
+                
+                // Increase animation time
+                animation.time += delta;
+                
+                // Determine if we should use full or simplified animation
+                const useFullAnimation = distSq < fullAnimDistance * fullAnimDistance;
+                
+                switch (animation.type) {
+                    case 'floating':
+                        // Simple sine wave floating motion - very efficient
+                        const floatY = animation.startY + Math.sin(animation.time * animation.floatSpeed) * animation.floatHeight;
+                        object.position.y = floatY;
+                        break;
+                        
+                    case 'orbiting':
+                        // Update orbit angle
+                        animation.angle += delta * animation.speed;
+                        
+                        // Update position - use temporary vector to avoid creating new objects
+                        tempVector.set(
+                            animation.centerX + Math.cos(animation.angle) * animation.radius,
+                            object.position.y,
+                            animation.centerZ + Math.sin(animation.angle) * animation.radius
+                        );
+                        object.position.copy(tempVector);
+                        
+                        // Make the object face center only if using full animation
+                        if (useFullAnimation) {
+                            // Use lookAt for closest objects
+                            tempVector.set(animation.centerX, animation.centerY, animation.centerZ);
+                            object.lookAt(tempVector);
+                        }
+                        break;
+                        
+                    case 'pulsing':
+                        // Pulsing scale - simplified for distant objects
+                        if (useFullAnimation) {
+                            // Full pulsing for close objects
+                            const pulseFactor = animation.minScale + (animation.maxScale - animation.minScale) *
+                                ((Math.sin(animation.time * animation.speed) + 1) / 2);
+                                
+                            object.scale.set(
+                                animation.originalScale.x * pulseFactor,
+                                animation.originalScale.y * pulseFactor,
+                                animation.originalScale.z * pulseFactor
+                            );
+                            
+                            // Update attached light if present
+                            if (object.userData.pointLight) {
+                                object.userData.pointLight.intensity = 0.7 + Math.sin(animation.time * animation.speed) * 0.3;
+                            }
+                        } else {
+                            // Simplified pulsing for distant objects - less frequent updates
+                            if (i % 3 === 0) { // Only update every 3rd object
+                                const simplePulseFactor = animation.minScale + 
+                                    (animation.maxScale - animation.minScale) * 0.5 * 
+                                    (1 + Math.sin(animation.time * animation.speed));
+                                    
+                                object.scale.setScalar(simplePulseFactor);
+                            }
+                        }
+                        break;
+                        
+                    case 'blinking':
+                        // Blinking emission - only update if material has emissive property
+                        if (object.material && object.material.emissive) {
+                            if (useFullAnimation) {
+                                // Full blinking animation for close objects
+                                if (animation.pattern === 'random') {
+                                    // Random blinking
+                                    animation.lastBlink += delta;
+                                    
+                                    if (animation.lastBlink > animation.nextBlink) {
+                                        animation.lastBlink = 0;
+                                        animation.nextBlink = Math.random() * 2;
+                                        
+                                        // Toggle between min and max
+                                        object.material.emissiveIntensity =
+                                            object.material.emissiveIntensity > animation.minIntensity ?
+                                            animation.minIntensity : animation.maxIntensity;
+                                    }
+                                } else {
+                                    // Regular sine wave blinking
+                                    object.material.emissiveIntensity = animation.minIntensity +
+                                        (animation.maxIntensity - animation.minIntensity) *
+                                        ((Math.sin(animation.time * animation.speed) + 1) / 2);
+                                }
+                            } else {
+                                // Simplified blinking for distant objects - less frequent updates
+                                if (i % 5 === 0) { // Update only every 5th distant object
+                                    // Use a simplified step function instead of sine
+                                    const blinkState = Math.floor(animation.time * animation.speed) % 2;
+                                    object.material.emissiveIntensity = blinkState ? 
+                                        animation.maxIntensity : animation.minIntensity;
+                                }
+                            }
+                        }
+                        break;
+                        
+                    case 'swaying':
+                        // Swaying motion - simplified for distant objects
+                        if (useFullAnimation || i % 3 === 0) { // Only update some distant objects
+                            object.rotation.x = animation.originalRotation.x +
+                                Math.sin(animation.time * animation.speed) * animation.maxAngle;
+                                
+                            object.rotation.z = animation.originalRotation.z +
+                                Math.cos(animation.time * animation.speed * 0.7) * animation.maxAngle;
+                        }
+                        break;
+                        
+                    case 'complex':
+                        // Combined animation - separate by distance
+                        if (useFullAnimation) {
+                            // Full animation for close objects
+                            // Floating
+                            object.position.y = animation.startY +
+                                Math.sin(animation.time * animation.floatSpeed) * animation.floatHeight;
+                                
+                            // Rotation
+                            object.rotation.y += delta * animation.rotationSpeed;
+                        } else {
+                            // Simplified animation for distant objects - just update position
+                            if (i % 2 === 0) { // Only update every other object
+                                object.position.y = animation.startY +
+                                    Math.sin(animation.time * animation.floatSpeed) * animation.floatHeight;
+                            }
+                        }
+                        break;
+                }
+                
+                animationCount++;
+            }
+            
+            // Return number of animated objects for debugging
+            return animationCount;
+        }
+
+        // Make file name labels face the camera - optimized with quaternion reuse
+        function updateLabels() {
+            // Skip label updates if not enough time has passed (throttling)
+            const now = performance.now();
+            const updateInterval = config.objectDetail === 'low' ? 250 : 100;
+            if (now - lastMiniMapUpdate < updateInterval && lastMiniMapUpdate !== 0) {
+                return;
+            }
+            
+            // Cache camera quaternion to avoid recalculation
+            camera.getWorldQuaternion(labelQuaternion);
+            
+            scene.traverse(object => {
+                if (object.userData && object.userData.type === 'label') {
+                    // Use cached quaternion for better performance
+                    object.quaternion.copy(labelQuaternion);
+                }
+            });
+        }
+
+        // Check if player has entered a new area
+        function checkAreaChange() {
+            let inArea = null;
+
+            for (const area of config.areas) {
+                const distance = Math.sqrt(
+                    Math.pow(camera.position.x - area.position.x, 2) +
+                    Math.pow(camera.position.z - area.position.z, 2)
+                );
+
+                if (distance < area.radius) {
+                    inArea = area;
+                    break;
+                }
+            }
+
+            // If entered a new area
+            if (inArea && (!currentArea || currentArea.name !== inArea.name)) {
+                currentArea = inArea;
+                showAreaName(inArea.name);
+            } else if (!inArea) {
+                currentArea = null;
+            }
+        }
+
+        // Setup mobile controls
+        function setupMobileControls() {
+            // Create joystick container
+            const joystickContainer = document.createElement('div');
+            joystickContainer.id = 'joystick-container';
+            joystickContainer.style.cssText = `
+                position: absolute;
+                bottom: 100px;
+                left: 50px;
+                width: 120px;
+                height: 120px;
+                background-color: rgba(0, 179, 255, 0.2);
+                border: 2px solid rgba(0, 179, 255, 0.5);
+                border-radius: 50%;
+                touch-action: none;
+                display: none;
+            `;
+            
+            // Create joystick knob
+            const joystickKnob = document.createElement('div');
+            joystickKnob.id = 'joystick-knob';
+            joystickKnob.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 50px;
+                height: 50px;
+                background-color: rgba(0, 179, 255, 0.6);
+                border: 2px solid rgba(0, 179, 255, 0.8);
+                border-radius: 50%;
+            `;
+            
+            joystickContainer.appendChild(joystickKnob);
+            document.body.appendChild(joystickContainer);
+            
+            // Create camera rotation controls
+            const rotateContainer = document.createElement('div');
+            rotateContainer.id = 'rotate-container';
+            rotateContainer.style.cssText = `
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 50%;
+                height: 100%;
+                touch-action: none;
+                display: none;
+            `;
+            document.body.appendChild(rotateContainer);
+            
+            // Show controls only on mobile devices
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                joystickContainer.style.display = 'block';
+                rotateContainer.style.display = 'block';
+            }
+            
+            // Add touch events for the joystick
+            setupJoystickEvents(joystickContainer, joystickKnob);
+            
+            // Add touch events for rotation
+            setupRotationEvents(rotateContainer);
+        }
+
+        function setupJoystickEvents(container, knob) {
+            let active = false;
+            let startX, startY;
+            let currentX, currentY;
+            const containerRect = container.getBoundingClientRect();
+            const centerX = containerRect.width / 2;
+            const centerY = containerRect.height / 2;
+            const maxDistance = containerRect.width / 2 - knob.offsetWidth / 2;
+            
+            // Touch events for joystick
+            container.addEventListener('touchstart', handleStart, false);
+            container.addEventListener('touchmove', handleMove, false);
+            container.addEventListener('touchend', handleEnd, false);
+            
+            function handleStart(event) {
+                event.preventDefault();
+                const touch = event.touches[0];
+                startX = touch.clientX - containerRect.left;
+                startY = touch.clientY - containerRect.top;
+                active = true;
+            }
+            
+            function handleMove(event) {
+                if (!active) return;
+                event.preventDefault();
+                
+                const touch = event.touches[0];
+                currentX = touch.clientX - containerRect.left;
+                currentY = touch.clientY - containerRect.top;
+                
+                // Calculate distance from center
+                let deltaX = currentX - centerX;
+                let deltaY = currentY - centerY;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                
+                // Normalize if distance is too great
+                if (distance > maxDistance) {
+                    deltaX = deltaX * maxDistance / distance;
+                    deltaY = deltaY * maxDistance / distance;
+                }
+                
+                // Update knob position
+                knob.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                
+                // Calculate movement direction and magnitude
+                const movementX = deltaX / maxDistance;
+                const movementY = deltaY / maxDistance;
+                
+                // Update movement variables
+                moveForward = movementY < -0.2;
+                moveBackward = movementY > 0.2;
+                moveLeft = movementX < -0.2;
+                moveRight = movementX > 0.2;
+            }
+            
+            function handleEnd() {
+                active = false;
+                knob.style.transform = 'translate(-50%, -50%)';
+                
+                // Reset movement
+                moveForward = moveBackward = moveLeft = moveRight = false;
+            }
+        }
+
+        function setupRotationEvents(container) {
+            let lastX = 0;
+            let lastY = 0;
+            let isDragging = false;
+            
+            container.addEventListener('touchstart', handleStart, false);
+            container.addEventListener('touchmove', handleMove, false);
+            container.addEventListener('touchend', handleEnd, false);
+            
+            function handleStart(event) {
+                const touch = event.touches[0];
+                lastX = touch.clientX;
+                lastY = touch.clientY;
+                isDragging = true;
+            }
+            
+            function handleMove(event) {
+                if (!isDragging) return;
+                event.preventDefault();
+                
+                const touch = event.touches[0];
+                const deltaX = touch.clientX - lastX;
+                const deltaY = touch.clientY - lastY;
+                
+                // Rotate camera
+                camera.rotation.y -= deltaX * 0.01; // Horizontal rotation
+                
+                // Limit vertical rotation
+                const verticalLook = camera.rotation.x - deltaY * 0.01;
+                camera.rotation.x = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, verticalLook));
+                
+                lastX = touch.clientX;
+                lastY = touch.clientY;
+            }
+            
+            function handleEnd() {
+                isDragging = false;
+            }
+        }
+
+        function adaptUIForMobile() {
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                // Adjust sidebar
+                sidebar.style.display = 'none';
+                
+                // Make toggle button larger for touch
+                toggleSidebar.style.width = '60px';
+                toggleSidebar.style.height = '60px';
+                toggleSidebar.style.fontSize = '30px';
+                
+                // Adjust content viewer
+                contentViewer.style.width = '100%';
+                
+                // Hide controls info on small screens
+                const controlsInfo = document.getElementById('controls-info');
+                controlsInfo.style.display = 'none';
+                
+                // Make mini-map smaller and more transparent
+                miniMap.style.width = '120px';
+                miniMap.style.height = '120px';
+                miniMap.style.opacity = '0.7';
+                
+                // Adjust file hover info
+                fileHoverInfo.style.maxWidth = '80%';
+                fileHoverInfo.style.fontSize = '14px';
+                
+                // Add mobile-specific buttons
+                addMobileButtons();
+            }
+        }
+
+        function optimizeForMobile() {
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                // Reduce shadow map size
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                // Reduce world size and object count
+                config.worldSize = 100; // Smaller world
+                
+                // Reduce number of environmental objects
+                const environmentalObjects = scene.children.filter(obj => 
+                    obj.userData && obj.userData.type === 'environment');
+                
+                // Keep only a portion of them
+                environmentalObjects.forEach((obj, index) => {
+                    if (index % 3 !== 0) { // Keep only 1/3 of objects
+                        scene.remove(obj);
+                    }
+                });
+                
+                // Lower render quality
+                renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : window.devicePixelRatio);
+                
+                // Reduce fog density for better performance
+                scene.fog.density = 0.01;
+            }
+        }
+
+        function addMobileButtons() {
+            // Create action buttons container
+            const actionButtons = document.createElement('div');
+            actionButtons.style.cssText = `
+                position: absolute;
+                bottom: 100px;
+                right: 50px;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            `;
+            
+            // Interact button
+            const interactButton = createButton('👆', 'Interact');
+            interactButton.addEventListener('touchstart', function() {
+                onMouseClick(); // Use the existing click function
+            });
+            
+            // Map toggle button
+            const mapButton = createButton('🗺️', 'Map');
+            mapButton.addEventListener('touchstart', function() {
+                config.miniMapVisible = !config.miniMapVisible;
+                miniMap.style.display = config.miniMapVisible ? 'block' : 'none';
+            });
+            
+            // Menu button
+            const menuButton = createButton('📋', 'Menu');
+            menuButton.addEventListener('touchstart', function() {
+                showSidebarPopup();
+            });
+            
+            actionButtons.appendChild(interactButton);
+            actionButtons.appendChild(mapButton);
+            actionButtons.appendChild(menuButton);
+            
+            document.body.appendChild(actionButtons);
+        }
+
+        function createButton(icon, label) {
+            const button = document.createElement('div');
+            button.style.cssText = `
+                width: 60px;
+                height: 60px;
+                background-color: rgba(10, 10, 24, 0.8);
+                border: 2px solid rgba(0, 179, 255, 0.6);
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 24px;
+                color: white;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            `;
+            button.innerHTML = icon;
+            button.setAttribute('aria-label', label);
+            
+            return button;
+        }
+
+        function showSidebarPopup() {
+            const sidebarPopup = document.createElement('div');
+            sidebarPopup.id = 'sidebar-popup';
+            sidebarPopup.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(10, 10, 24, 0.95);
+                z-index: 200;
+                overflow-y: auto;
+                padding: 20px;
+                box-sizing: border-box;
+            `;
+            
+            const closeButton = document.createElement('button');
+            closeButton.textContent = '×';
+            closeButton.style.cssText = `
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: none;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: var(--text-color);
+                cursor: pointer;
+                font-size: 1.5rem;
+                padding: 5px 10px;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+            `;
+            closeButton.addEventListener('click', () => {
+                document.body.removeChild(sidebarPopup);
+            });
+            
+            sidebarPopup.appendChild(closeButton);
+            sidebarPopup.appendChild(sidebar.cloneNode(true));
+            document.body.appendChild(sidebarPopup);
+        }
+
+        function enhancedOptimizeForMobile() {
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                console.log("Applying enhanced mobile optimizations");
+                
+                // Drastically reduce shadow quality
+                renderer.shadowMap.type = THREE.BasicShadowMap;
+                
+                // Reduce render resolution on high-DPI devices
+                const pixelRatio = Math.min(window.devicePixelRatio, 1.5);
+                renderer.setPixelRatio(pixelRatio);
+                
+                // Reduce draw distance with stronger fog
+                scene.fog.density = 0.025;
+                
+                // Simplify geometries
+                simplifySceneGeometries();
+                
+                // Reduce lighting complexity
+                simplifyLighting();
+                
+                // Limit max FPS to save battery
+                renderer.setAnimationLoop((time) => {
+                    // Cap at 30fps for better battery life
+                    animate(time);
+                });
+                
+                // Create enhanced mobile controls
+                createEnhancedMobileControls();
+            }
+        }
+
+        function simplifySceneGeometries() {
+            scene.traverse(object => {
+                // Skip non-mesh objects
+                if (!object.isMesh) return;
+                
+                // Reduce polygon count for distant objects
+                const distance = camera.position.distanceTo(object.position);
+                if (distance > 30 && object.geometry.type.includes("Geometry")) {
+                    // Create simplified version if it doesn't have one
+                    if (!object.userData.simplifiedGeometry) {
+                        // For sphere geometries
+                        if (object.geometry.type.includes("SphereGeometry")) {
+                            const params = object.geometry.parameters;
+                            const simplifiedGeo = new THREE.SphereGeometry(
+                                params.radius,
+                                Math.max(4, Math.floor(params.widthSegments / 2)),
+                                Math.max(4, Math.floor(params.heightSegments / 2))
+                            );
+                            object.userData.simplifiedGeometry = simplifiedGeo;
+                            object.userData.originalGeometry = object.geometry;
+                            object.geometry = simplifiedGeo;
+                        }
+                        // For box geometries (already simple, but store for reference)
+                        else if (object.geometry.type.includes("BoxGeometry")) {
+                            object.userData.originalGeometry = object.geometry;
+                        }
+                    }
+                }
+                
+                // Simplify materials
+                if (object.material) {
+                    // Reduce emission intensity
+                    if (object.material.emissive && object.material.emissiveIntensity > 0.3) {
+                        object.material.emissiveIntensity = 0.3;
+                    }
+                    
+                    // Use simple materials for distant objects
+                    if (distance > 50 && !object.userData.simplifiedMaterial) {
+                        const color = object.material.color ? object.material.color.clone() : new THREE.Color(0x888888);
+                        const simpleMaterial = new THREE.MeshBasicMaterial({ color: color });
+                        object.userData.originalMaterial = object.material;
+                        object.userData.simplifiedMaterial = simpleMaterial;
+                        
+                        // Only switch to basic material if it's not an important object
+                        if (!object.userData.isImportant) {
+                            object.material = simpleMaterial;
+                        }
+                    }
+                }
+            });
+        }
+
+        function simplifyLighting() {
+            // Find and modify lights
+            let pointLightCount = 0;
+            
+            scene.traverse(object => {
+                if (object.isPointLight) {
+                    pointLightCount++;
+                    
+                    // Keep important lights, disable distant ones
+                    const distance = camera.position.distanceTo(object.position);
+                    if (distance > 40 && pointLightCount > 5) {
+                        object.visible = false;
+                    }
+                    
+                    // Reduce shadow quality
+                    if (object.castShadow) {
+                        object.shadow.mapSize.width = 256;
+                        object.shadow.mapSize.height = 256;
+                        object.shadow.radius = 4;
+                    }
+                }
+            });
+        }
+
+        function createEnhancedMobileControls() {
+            // Remove existing mobile controls
+            const existingJoystick = document.getElementById('joystick-container');
+            if (existingJoystick) {
+                existingJoystick.remove();
+            }
+            
+            const existingRotate = document.getElementById('rotate-container');
+            if (existingRotate) {
+                existingRotate.remove();
+            }
+            
+            // Create control container
+            const controlContainer = document.createElement('div');
+            controlContainer.id = 'mobile-controls';
+            controlContainer.style.cssText = `
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 50%;
+                touch-action: none;
+                pointer-events: none;
+                z-index: 100;
+            `;
+            document.body.appendChild(controlContainer);
+            
+            // Create left joystick (movement)
+            const leftJoystick = createJoystick('movement-joystick', 'left');
+            controlContainer.appendChild(leftJoystick.container);
+            
+            // Create right joystick (camera)
+            const rightJoystick = createJoystick('camera-joystick', 'right');
+            controlContainer.appendChild(rightJoystick.container);
+            
+            // Create improved action buttons
+            createImprovedActionButtons(controlContainer);
+            
+            // Setup joystick event handlers
+            setupJoystickHandlers(leftJoystick, rightJoystick);
+        }
+
+        function createJoystick(id, position) {
+            const container = document.createElement('div');
+            container.id = id + '-container';
+            container.style.cssText = `
+                position: absolute;
+                bottom: 80px;
+                ${position === 'left' ? 'left: 80px' : 'right: 80px'};
+                width: 150px;
+                height: 150px;
+                background-color: rgba(0, 179, 255, 0.15);
+                border: 2px solid rgba(0, 179, 255, 0.3);
+                border-radius: 50%;
+                pointer-events: auto;
+            `;
+            
+            const knob = document.createElement('div');
+            knob.id = id + '-knob';
+            knob.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 60px;
+                height: 60px;
+                background-color: rgba(0, 179, 255, 0.5);
+                border: 2px solid rgba(0, 179, 255, 0.8);
+                border-radius: 50%;
+                box-shadow: 0 0 10px rgba(0, 179, 255, 0.5);
+            `;
+            
+            const label = document.createElement('div');
+            label.style.cssText = `
+                position: absolute;
+                top: -30px;
+                left: 0;
+                width: 100%;
+                text-align: center;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 14px;
+            `;
+            label.textContent = position === 'left' ? 'Move' : 'Look';
+            
+            container.appendChild(knob);
+            container.appendChild(label);
+            
+            return { container, knob, position, active: false, angle: 0, power: 0 };
+        }
+
+        function createImprovedActionButtons(parent) {
+            const buttonContainer = document.createElement('div');
+            buttonContainer.id = 'action-buttons';
+            buttonContainer.style.cssText = `
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                display: flex;
+                gap: 15px;
+                pointer-events: auto;
+            `;
+            
+            // Create interact button
+            const interactButton = createImprovedButton('👆', 'Interact');
+            interactButton.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                onMouseClick();
+                // Add haptic feedback if available
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(50);
+                }
+            });
+            
+            // Create map button
+            const mapButton = createImprovedButton('🗺️', 'Map');
+            mapButton.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                config.miniMapVisible = !config.miniMapVisible;
+                miniMap.style.display = config.miniMapVisible ? 'block' : 'none';
+                // Add haptic feedback
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(50);
+                }
+            });
+            
+            // Create teleport/jump button
+            const teleportButton = createImprovedButton('⭐', 'Teleport');
+            teleportButton.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                showLocationPopup();
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(50);
+                }
+            });
+            
+            buttonContainer.appendChild(interactButton);
+            buttonContainer.appendChild(mapButton);
+            buttonContainer.appendChild(teleportButton);
+            
+            parent.appendChild(buttonContainer);
+        }
+
+        function createImprovedButton(icon, label) {
+            const button = document.createElement('div');
+            button.style.cssText = `
+                width: 70px;
+                height: 70px;
+                background-color: rgba(10, 10, 24, 0.8);
+                border: 2px solid rgba(0, 179, 255, 0.6);
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 28px;
+                color: white;
+                -webkit-tap-highlight-color: transparent;
+                cursor: pointer;
+                transition: transform 0.1s, background-color 0.2s;
+            `;
+            
+            button.innerHTML = icon;
+            button.setAttribute('aria-label', label);
+            
+            // Add press effect
+            button.addEventListener('touchstart', function() {
+                button.style.transform = 'scale(0.9)';
+                button.style.backgroundColor = 'rgba(0, 179, 255, 0.4)';
+            });
+            
+            button.addEventListener('touchend', function() {
+                button.style.transform = 'scale(1)';
+                button.style.backgroundColor = 'rgba(10, 10, 24, 0.8)';
+            });
+            
+            return button;
+        }
+
+        function setupJoystickHandlers(leftJoystick, rightJoystick) {
+            // Movement joystick (left)
+            leftJoystick.container.addEventListener('touchstart', function(e) {
+                handleJoystickStart(e, leftJoystick);
+            });
+            
+            leftJoystick.container.addEventListener('touchmove', function(e) {
+                handleJoystickMove(e, leftJoystick);
+                // Update movement based on joystick position
+                updateMovementFromJoystick(leftJoystick);
+            });
+            
+            leftJoystick.container.addEventListener('touchend', function() {
+                resetJoystick(leftJoystick);
+                // Reset movement
+                moveForward = moveBackward = moveLeft = moveRight = false;
+            });
+            
+            // Camera joystick (right)
+            rightJoystick.container.addEventListener('touchstart', function(e) {
+                handleJoystickStart(e, rightJoystick);
+            });
+            
+            rightJoystick.container.addEventListener('touchmove', function(e) {
+                handleJoystickMove(e, rightJoystick);
+                // Update camera rotation based on joystick position
+                updateCameraFromJoystick(rightJoystick);
+            });
+            
+            rightJoystick.container.addEventListener('touchend', function() {
+                resetJoystick(rightJoystick);
+            });
+        }
+
+        function handleJoystickStart(event, joystick) {
+            event.preventDefault();
+            const touch = event.touches[0];
+            const rect = joystick.container.getBoundingClientRect();
+            joystick.active = true;
+            
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Calculate initial position
+            updateJoystickPosition(touch.clientX, touch.clientY, joystick);
+        }
+
+        function handleJoystickMove(event, joystick) {
+            if (!joystick.active) return;
+            event.preventDefault();
+            
+            const touch = event.touches[0];
+            updateJoystickPosition(touch.clientX, touch.clientY, joystick);
+        }
+
+        function updateJoystickPosition(touchX, touchY, joystick) {
+            const rect = joystick.container.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            
+            // Calculate direction vector from center to touch
+            let deltaX = touchX - (rect.left + centerX);
+            let deltaY = touchY - (rect.top + centerY);
+            
+            // Calculate distance from center (power)
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const maxDistance = rect.width / 2 - 30; // Adjust for knob radius
+            
+            // Normalize and clamp
+            let power = Math.min(distance / maxDistance, 1.0);
+            
+            // Calculate angle in radians
+            const angle = Math.atan2(deltaY, deltaX);
+            
+            // If beyond max distance, clamp position to the circle edge
+            if (distance > maxDistance) {
+                deltaX = Math.cos(angle) * maxDistance;
+                deltaY = Math.sin(angle) * maxDistance;
+            }
+            
+            // Update knob position
+            joystick.knob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+            
+            // Update joystick state
+            joystick.angle = angle;
+            joystick.power = power;
+        }
+
+        function resetJoystick(joystick) {
+            joystick.active = false;
+            joystick.power = 0;
+            joystick.knob.style.transform = 'translate(-50%, -50%)';
+        }
+
+        function updateMovementFromJoystick(joystick) {
+            if (!joystick.active || joystick.power < 0.1) {
+                // Reset movement if joystick is centered or barely moved
+                moveForward = moveBackward = moveLeft = moveRight = false;
+                return;
+            }
+            
+            // Map angle to direction
+            // Forward: -π/4 to π/4
+            // Right: π/4 to 3π/4
+            // Back: 3π/4 to 5π/4
+            // Left: 5π/4 to 7π/4
+            const angle = joystick.angle;
+            const power = joystick.power;
+            
+            // Reset all movement
+            moveForward = moveBackward = moveLeft = moveRight = false;
+            
+            // Set movement based on angle quadrant with gradual transitions
+            if (angle > -Math.PI/4 && angle < Math.PI/4) {
+                // Right
+                moveRight = true;
+                // Blend with adjacent directions for smooth movement
+                if (angle > 0) moveForward = power * Math.sin(angle);
+                else moveBackward = -power * Math.sin(angle);
+            } 
+            else if (angle >= Math.PI/4 && angle < 3*Math.PI/4) {
+                // Down
+                moveBackward = true;
+                moveRight = power * Math.cos(angle - Math.PI/2);
+            }
+            else if ((angle >= 3*Math.PI/4 && angle <= Math.PI) || (angle >= -Math.PI && angle < -3*Math.PI/4)) {
+                // Left
+                moveLeft = true;
+                if (angle > 0) moveBackward = power * Math.sin(angle - Math.PI);
+                else moveForward = -power * Math.sin(angle + Math.PI);
+            }
+            else if (angle >= -3*Math.PI/4 && angle < -Math.PI/4) {
+                // Up
+                moveForward = true;
+                moveLeft = power * -Math.cos(angle + Math.PI/2);
+            }
+            
+            // Scale movement by power for analog control
+            config.currentMovementScale = power;
+        }
+
+        function updateCameraFromJoystick(joystick) {
+            if (!joystick.active || joystick.power < 0.1) return;
+            
+            const angle = joystick.angle;
+            const power = joystick.power;
+            
+            // Horizontal rotation (X-axis movement of joystick)
+            const horizontalRotation = Math.cos(angle) * power * 0.05;
+            camera.rotation.y -= horizontalRotation;
+            
+            // Vertical rotation (Y-axis movement of joystick)
+            const verticalRotation = Math.sin(angle) * power * 0.05;
+            const newVerticalAngle = camera.rotation.x + verticalRotation;
+            
+            // Limit vertical look angle
+            camera.rotation.x = Math.max(-Math.PI/3, Math.min(Math.PI/3, newVerticalAngle));
+        }
+
+        function showLocationPopup() {
+            // Create popup container
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                bottom: 50%;
+                left: 50%;
+                transform: translate(-50%, 50%);
+                background-color: rgba(10, 10, 24, 0.9);
+                border: 2px solid rgba(0, 179, 255, 0.5);
+                border-radius: 15px;
+                padding: 20px;
+                z-index: 1000;
+                min-width: 250px;
+                max-width: 80%;
+                box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            `;
+            
+            // Create title
+            const title = document.createElement('div');
+            title.textContent = 'Teleport to Location';
+            title.style.cssText = `
+                color: var(--accent-color);
+                font-size: 18px;
+                margin-bottom: 15px;
+                text-align: center;
+                font-weight: bold;
+            `;
+            
+            // Create location buttons
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            `;
+            
+            // Add location buttons
+            config.areas.forEach(area => {
+                const button = document.createElement('button');
+                button.textContent = area.name;
+                button.style.cssText = `
+                    background-color: rgba(0, 179, 255, 0.2);
+                    border: 1px solid rgba(0, 179, 255, 0.5);
+                    border-radius: 8px;
+                    padding: 12px;
+                    color: white;
+                    font-size: 16px;
+                    text-align: left;
+                `;
+                
+                // Add color indicator
+                const colorBox = document.createElement('span');
+                colorBox.style.cssText = `
+                    display: inline-block;
+                    width: 15px;
+                    height: 15px;
+                    border-radius: 3px
+            `;
+                colorBox.style.backgroundColor = `#${area.color.toString(16).padStart(6, '0')}`;
+                button.prepend(colorBox);
+                
+                // Teleport to area when clicked
+                button.addEventListener('click', () => {
+                    camera.position.set(area.position.x + 5, 2, area.position.z + 5);
+                    camera.lookAt(area.position.x, 2, area.position.z);
+                    document.body.removeChild(popup);
+                });
+                
+                buttonContainer.appendChild(button);
+            });
+            
+            popup.appendChild(title);
+            popup.appendChild(buttonContainer);
+            document.body.appendChild(popup);
+        }
+
+        // Start the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
