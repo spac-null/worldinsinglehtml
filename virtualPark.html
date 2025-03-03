@@ -251,7 +251,7 @@
         <div id="dialog-title">Interactive Object</div>
         <div id="dialog-content">Description of the interactive object goes here.</div>
         <div id="dialog-buttons">
-            <a href="javascript:void(0)" id="dialog-close" style="z-index: 900; cursor: pointer; background-color: #ffcc00; color: black; padding: 8px 20px; border-radius: 20px; text-decoration: none; display: inline-block; font-weight: bold;" onclick="document.getElementById('interaction-dialog').style.display='none';">Close</a>
+            <!-- Close button will be created dynamically -->
         </div>
     </div>
     
@@ -1291,13 +1291,11 @@
                         document.getElementById('interaction-dialog').style.display = 'none';
                     };
                     
-                    // Remove any dynamically added buttons from previous dialogs
+                    // Get the dialog buttons container and clear it
                     const dialogButtons = document.getElementById('dialog-buttons');
-                    // Clear existing buttons except the close button
-                    const closeBtn = document.getElementById('dialog-close');
-                    
-                    // Make sure the close button keeps its original HTML inline handler
-                    closeBtn.setAttribute('onclick', "document.getElementById('interaction-dialog').style.display='none';");
+                    while (dialogButtons.firstChild) {
+                        dialogButtons.removeChild(dialogButtons.firstChild);
+                    };
                     
                     // 3. Background click handler
                     dialogEl.onclick = function(e) {
@@ -1345,6 +1343,27 @@
                             contentEl.appendChild(actionBtn);
                         });
                     }
+                    
+                    // Create and add the close button to the dialog buttons container
+                    const closeButton = document.createElement('button');
+                    closeButton.textContent = "Close";
+                    closeButton.type = "button";
+                    closeButton.className = "action-btn"; // Use the same class as working buttons
+                    closeButton.style.marginRight = '10px';
+                    closeButton.style.marginBottom = '15px';
+                    closeButton.style.background = '#ffcc00';
+                    closeButton.style.color = 'black';
+                    closeButton.style.border = 'none';
+                    closeButton.style.padding = '8px 15px';
+                    closeButton.style.borderRadius = '15px';
+                    closeButton.style.cursor = 'pointer';
+                    closeButton.style.zIndex = '700';
+                    
+                    closeButton.onclick = function() {
+                        window.closeInteractionDialog();
+                    };
+                    
+                    dialogButtons.appendChild(closeButton);
                     
                     // Show dialog
                     dialogEl.style.display = 'block';
