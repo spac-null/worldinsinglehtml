@@ -1,0 +1,209 @@
+
+Live Generative Art from Webcam with Debug Board
+This project creates a real-time generative art video from your webcam, applying advanced distortion effects (using Perlin noise) and providing an interactive debug board to adjust parameters on-the-fly. Inspired by works like Ix Shells' "BEND," it offers a dynamic, organic bending effect on live video, making it an excellent tool for artists, developers, and enthusiasts of algorithmic art.
+Table of Contents
+Description (#description)
+Features (#features)
+Prerequisites (#prerequisites)
+Installation (#installation)
+Usage (#usage)
+Parameters (#parameters)
+Screenshots (#screenshots)
+Source Code (#source-code)
+Contributing (#contributing)
+License (#license)
+Contact (#contact)
+Description
+This Python project uses OpenCV, NumPy, and the noise library to capture live video from your webcam, apply complex distortions using Perlin noise, and display the output in real-time. An interactive debug board with sliders and keyboard controls allows you to tweak parameters like distortion intensity, noise scale, octaves, persistence, and lacunarity, enabling live experimentation with generative art effects.
+Features
+Real-time webcam input with dynamic distortion effects.
+Advanced Perlin noise-based bending and warping for organic, evolving patterns.
+Interactive debug board with sliders to adjust parameters on-the-fly.
+Keyboard controls for quick adjustments and resetting parameters.
+Lightweight and customizable for artistic or educational purposes.
+Prerequisites
+Before you begin, ensure you have the following installed:
+Python 3.x (Python 3.7 or higher recommended)
+pip (Python package manager)
+Required Python libraries:
+numpy
+opencv-python
+noise
+Installation
+Clone or download this repository to your local machine:
+bash
+git clone <your-repo-url>
+cd live-generative-art
+Install the required dependencies using pip:
+bash
+pip3 install numpy opencv-python noise
+Verify your webcam is working (e.g., test with python3 -c "import cv2; cap = cv2.VideoCapture(0); ret, frame = cap.read(); cv2.imshow('Test', frame); cv2.waitKey(0); cap.release(); cv2.destroyAllWindows()") to ensure CAMERA_INDEX (default 0) is correct.
+Usage
+Navigate to the project directory in Terminal.
+Run the script:
+bash
+python3 live_bend_webcam_debug.py
+A window will open showing the live generative art from your webcam. A second window ("Debug Board") will display sliders and parameter values for real-time adjustments.
+Use the sliders to modify parameters like distortion intensity, noise scale, octaves, persistence, and lacunarity.
+Press q to quit or r to reset parameters to defaults.
+Parameters
+The debug board allows you to adjust the following parameters:
+Distortion Intensity: Controls the magnitude of the bending effect (0–100 pixels).
+Scale (x100): Scales the Perlin noise pattern (0.01–0.50).
+Octaves: Number of octaves for Perlin noise detail (1–8).
+Persistence (x10): Persistence of Perlin noise (0.1–1.0).
+Lacunarity (x10): Lacunarity of Perlin noise (0.2–5.0).
+Screenshots
+(Include actual screenshots or placeholder text here if you have images. For now, here’s a placeholder:)
+Live Generative Art Output
+Live generative art output with distortion effect.
+Debug Board
+Interactive debug board for parameter adjustment.
+(To add real screenshots, capture the output windows and replace the placeholder URLs with actual image paths or upload them to GitHub and link them.)
+Source Code
+Below is the full source code for live_bend_webcam_debug.py:
+python
+import cv2
+import numpy as np
+from noise import pnoise2
+import time
+
+# Webcam settings
+WIDTH = 800  # Video width (resize for performance)
+HEIGHT = 600  # Video height
+CAMERA_INDEX = 0  # Typically 0 for the built-in MacBook webcam
+
+# Initialize the webcam
+cap = cv2.VideoCapture(CAMERA_INDEX)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
+
+# Check if the webcam opened successfully
+if not cap.isOpened():
+    print("Error: Could not open webcam.")
+    exit()
+
+# Initial parameters for Perlin noise and distortion
+DISTORTION_INTENSITY = 20  # How much to distort (pixels)
+SCALE = 0.01              # Scale for Perlin noise
+OCTAVES = 4               # Number of octaves for more detail
+PERSISTENCE = 0.5         # Persistence for Perlin noise
+LACUNARITY = 2.0          # Lacunarity for Perlin noise
+
+# Create a window for the debug board
+cv2.namedWindow('Debug Board')
+
+# Add trackbars for parameter adjustment
+cv2.createTrackbar('Distortion', 'Debug Board', DISTORTION_INTENSITY, 100, lambda x: None)
+cv2.createTrackbar('Scale (x100)', 'Debug Board', int(SCALE * 100), 50, lambda x: None)
+cv2.createTrackbar('Octaves', 'Debug Board', OCTAVES, 8, lambda x: None)
+cv2.createTrackbar('Persistence (x10)', 'Debug Board', int(PERSISTENCE * 10), 10, lambda x: None)
+cv2.createTrackbar('Lacunarity (x10)', 'Debug Board', int(LACUNARITY * 10), 50, lambda x: None)
+
+def apply_advanced_distortion(frame, time, distortion_intensity, scale, octaves, persistence, lacunarity):
+    """
+    Apply an advanced distortion effect using Perlin noise to the frame.
+    """
+    height, width = frame.shape[:2]
+    distorted_frame = np.zeros_like(frame, dtype=np.float32)
+    
+    # Generate Perlin noise for x and y offsets
+    for y in range(height):
+        for x in range(width):
+            # Use Perlin noise to create smooth, organic distortions
+            noise_x = pnoise2(x * scale, y * scale + time * 0.1, octaves=octaves, persistence=persistence, lacunarity=lacunarity)
+            noise_y = pnoise2(y * scale, x * scale + time * 0.05, octaves=octaves, persistence=persistence, lacunarity=lacunarity)
+            
+            # Scale noise to control distortion intensity
+            offset_x = int(distortion_intensity * noise_x)
+            offset_y = int(distortion_intensity * noise_y)
+            
+            # Apply the offset (wrap around edges)
+            new_x = (x + offset_x) % width
+            new_y = (y + offset_y) % height
+            
+            distorted_frame[y, x] = frame[new_y, new_x]
+    
+    return distorted_frame.astype(np.uint8)
+
+# Main loop for real-time processing
+start_time = time.time()
+try:
+    while True:
+        # Capture frame-by-frame
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Could not read frame.")
+            break
+        
+        # Resize frame for performance (optional)
+        frame = cv2.resize(frame, (WIDTH, HEIGHT))
+        
+        # Calculate time for animation
+        current_time = time.time() - start_time
+        
+        # Get current parameter values from trackbars
+        distortion_intensity = cv2.getTrackbarPos('Distortion', 'Debug Board')
+        scale = cv2.getTrackbarPos('Scale (x100)', 'Debug Board') / 100.0
+        octaves = cv2.getTrackbarPos('Octaves', 'Debug Board')
+        persistence = cv2.getTrackbarPos('Persistence (x10)', 'Debug Board') / 10.0
+        lacunarity = cv2.getTrackbarPos('Lacunarity (x10)', 'Debug Board') / 10.0
+        
+        # Apply advanced distortion with current parameters
+        distorted_frame = apply_advanced_distortion(frame, current_time, distortion_intensity, scale, octaves, persistence, lacunarity)
+        
+        # Create debug board display
+        debug_board = np.zeros((200, 400, 3), dtype=np.uint8)
+        debug_text = f"Distortion: {distortion_intensity}\nScale: {scale:.2f}\nOctaves: {octaves}\nPersistence: {persistence:.1f}\nLacunarity: {lacunarity:.1f}"
+        y0, dy = 30, 30
+        for i, line in enumerate(debug_text.split('\n')):
+            y = y0 + i * dy
+            cv2.putText(debug_board, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Display the distorted frame and debug board
+        cv2.imshow('Live Generative Art (Press q to quit)', distorted_frame)
+        cv2.imshow('Debug Board', debug_board)
+        
+        # Handle keyboard controls (optional for fine-tuning)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):  # Quit
+            break
+        elif key == ord('r'):  # Reset to defaults
+            cv2.setTrackbarPos('Distortion', 'Debug Board', 20)
+            cv2.setTrackbarPos('Scale (x100)', 'Debug Board', 1)
+            cv2.setTrackbarPos('Octaves', 'Debug Board', 4)
+            cv2.setTrackbarPos('Persistence (x10)', 'Debug Board', 5)
+            cv2.setTrackbarPos('Lacunarity (x10)', 'Debug Board', 20)
+
+except KeyboardInterrupt:
+    print("Stopped by user.")
+
+finally:
+    # Release the webcam and destroy windows
+    cap.release()
+    cv2.destroyAllWindows()
+
+print("Live generative art stopped.")
+Contributing
+Contributions are welcome! Here’s how you can contribute:
+Fork this repository.
+Create a new branch for your feature or bug fix:
+bash
+git checkout -b feature/your-feature-name
+Make your changes and commit them:
+bash
+git commit -m "Add your commit message here"
+Push to the branch:
+bash
+git push origin feature/your-feature-name
+Open a pull request with a clear description of your changes.
+Please ensure your code follows PEP 8 style guidelines and includes appropriate tests or documentation.
+License
+This project is licensed under the MIT License. See the LICENSE file for details.
+Contact
+Author: Space:Null;
+Email: dev@spacenull.it
+GitHub: Your GitHub Profile
+Feel free to reach out with questions, suggestions, or collaboration ideas!
+Notes
+.
