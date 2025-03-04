@@ -1,0 +1,119 @@
+{
+  "project": {
+    "type": "3d-game",
+    "framework": "html5-webgl",
+    "primary_libraries": ["three.js", "cannon.js", "socket.io", "express.js"],
+    "secondary_libraries": ["a-frame", "babylon.js", "playcanvas"],
+    "target_platform": "web-browser",
+    "performance_goals": ["hardware-acceleration", "low-latency", "real-time-multiplayer", "cross-browser-compatibility"]
+  },
+  "coding_conventions": {
+    "language": "javascript",
+    "style": {
+      "indentation": "2-spaces",
+      "semicolons": true,
+      "quotes": "single",
+      "es_version": "es6+"
+    },
+    "naming": {
+      "variables": "camelCase",
+      "functions": "camelCase",
+      "classes": "PascalCase",
+      "constants": "UPPER_SNAKE_CASE"
+    },
+    "comments": {
+      "required": true,
+      "style": "jsdoc",
+      "frequency": "complex-logic-only"
+    }
+  },
+  "ai_behavior": {
+    "role": "3d-game-developer",
+    "expertise": [
+      "webgl-3d-rendering",
+      "three.js-game-logic",
+      "cannon.js-physics",
+      "socket.io-real-time-sync",
+      "express.js-server-logic",
+      "sqlite-database-management"
+    ],
+    "focus_areas": [
+      "performance-optimization",
+      "dynamic-3d-world-generation",
+      "user-interface-design",
+      "game-mechanics-implementation",
+      "multiplayer-synchronization",
+      "server-client-communication"
+    ],
+    "constraints": {
+      "max_code_length": 5000,
+      "avoid_redundancy": true,
+      "maintain_modularity": true
+    }
+  },
+  "file_structure": {
+    "recommended": {
+      "root": ["index.html", "styles.css", "main.js", "server.js"],
+      "assets": ["models/", "textures/", "sounds/", "shaders/", "character_models/"],
+      "scripts": {
+        "client": {
+          "game_logic": ["player.js", "bot.js", "weapons.js", "camera.js"],
+          "rendering": ["renderer.js", "scene.js"],
+          "ui": ["menu.js", "hud.js"],
+          "networking": ["socketClient.js"]
+        },
+        "server": {
+          "game_logic": ["gameState.js", "roomManagement.js"],
+          "networking": ["socketServer.js"],
+          "database": ["database.js"]
+        }
+      },
+      "configs": [".cursorrules", "package.json"]
+    },
+    "avoid": ["nested_deep_directories", "unused_files"]
+  },
+  "testing": {
+    "requirements": [
+      "cross-browser-compatibility",
+      "performance-profiling",
+      "unit-tests-for-game-logic",
+      "integration-tests-for-multiplayer",
+      "database-testing"
+    ],
+    "tools": ["jest", "playwright", "lighthouse", "webgl-inspector", "sqlite-testing"]
+  },
+  "optimization": {
+    "rules": [
+      "minify-assets",
+      "lazy-load-textures",
+      "use-web-workers-for-heavy-computation",
+      "cache-3d-models",
+      "optimize-shaders",
+      "reduce-draw-calls",
+      "efficient-server-client-sync"
+    ]
+  },
+  "examples": {
+    "positive": [
+      "use-three.js-for-3d-rendering",
+      "implement-cannon.js-for-physics",
+      "use-socket.io-for-real-time-multiplayer",
+      "create-responsive-ui-with-html-css",
+      "leverage-webgl-for-hardware-acceleration",
+      "manage-game-state-with-sqlite"
+    ],
+    "negative": [
+      "overuse-of-synchronous-calls",
+      "complex-nested-loops-in-render",
+      "ignoring-hardware-acceleration",
+      "unoptimized-shader-code",
+      "large-uncompressed-assets",
+      "inefficient-server-client-latency"
+    ]
+  },
+  "documentation": {
+    "required": true,
+    "format": "markdown",
+    "sections": ["setup", "game-mechanics", "api-reference", "server-architecture", "database-structure", "performance-tips", "troubleshooting"]
+  }
+}
